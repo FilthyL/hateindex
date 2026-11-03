@@ -1,0 +1,79 @@
+{
+  "reddit": {
+    "last_run": "2026-11-03T20:22:47+00:00",
+    "new": 0,
+    "stored": 0,
+    "ok": false,
+    "error": "RuntimeError: reddit appears to block unauthenticated requests: HTTP Error 403: Blocked"
+  },
+  "4chan": {
+    "last_run": "2026-11-03T20:22:47+00:00",
+    "new": 354,
+    "stored": 354,
+    "ok": true,
+    "error": null
+  },
+  "gdelt": {
+    "last_run": "2026-11-03T20:22:47+00:00",
+    "new": 0,
+    "stored": 0,
+    "ok": true,
+    "error": null
+  },
+  "google_news": {
+    "last_run": "2026-11-03T20:22:47+00:00",
+    "new": 689,
+    "stored": 689,
+    "ok": true,
+    "error": null
+  },
+  "hackernews": {
+    "last_run": "2026-11-03T20:22:47+00:00",
+    "new": 3639,
+    "stored": 3639,
+    "ok": true,
+    "error": null
+  },
+  "mastodon": {
+    "last_run": "2026-11-03T20:22:47+00:00",
+    "new": 610,
+    "stored": 610,
+    "ok": true,
+    "error": null
+  },
+  "bluesky": {
+    "last_run": "2026-11-03T20:22:47+00:00",
+    "new": 96,
+    "stored": 96,
+    "ok": false,
+    "error": "HTTPError: HTTP Error 403: Forbidden"
+  },
+  "medium": {
+    "last_run": "2026-11-03T20:22:47+00:00",
+    "new": 60,
+    "stored": 60,
+    "ok": true,
+    "error": null
+  },
+  "wordpress": {
+    "last_run": "2026-11-03T20:22:47+00:00",
+    "new": 120,
+    "stored": 120,
+    "ok": true,
+    "error": null
+  },
+  "youtube": {
+    "last_run": "2026-11-03T20:22:47+00:00",
+    "new": 0,
+    "stored": 0,
+    "ok": false,
+    "error": "RuntimeError: skipped: set YOUTUBE_API_KEY to enable"
+  },
+  "x": {
+    "last_run": "2026-11-03T20:22:47+00:00",
+    "new": 0,
+    "stored": 0,
+    "ok": false,
+    "error": "RuntimeError: skipped: set X_BEARER_TOKEN to enable"
+  }
+}
