@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Indian Hate Index</title>
+<meta name="description" content="Where online hostility toward Indians comes from, why, and which stereotypes drive it — measured from public social media, news and blogs.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="wrap top">
+  <div>
+    <h1>Indian Hate Index</h1>
+    <p class="lede">Where online hostility toward Indians comes from, what drives it, and which stereotypes keep coming up. Built from public posts, news headlines and blogs, with sarcasm and counter-speech filtered out.</p>
+  </div>
+  <button id="theme" class="ghost" aria-label="Toggle dark mode">Dark / light</button>
+</header>
+
+<main class="wrap">
+  <div id="status" class="status" role="status">Loading data…</div>
+
+  <section class="card map-card">
+    <div class="controls" role="toolbar" aria-label="Map layer">
+      <span class="muted">Measure:</span>
+      <button class="seg active" data-layer="people">People (social media)</button>
+      <button class="seg" data-layer="media">Media (news)</button>
+      <button class="seg" data-layer="all">Combined</button>
+    </div>
+    <div id="map" class="map" aria-label="World map of the Indian Hate Index"></div>
+    <div id="legend" class="legend"></div>
+    <p class="hint muted">Hover over (or tap) a country to see why people there post hostile things about Indians and which stereotypes they repeat. Scroll or pinch to zoom.</p>
+  </section>
+
+  <div id="tip" class="tip" hidden></div>
+
+  <section class="grid2">
+    <div class="card">
+      <h2>Ranking</h2>
+      <p class="muted small">Index 0–100: the average hostility of each person posting about Indians from that country (adjusted for sample size). Countries with fewer than 10 authors aren't ranked. India itself is shown on the map but not ranked.</p>
+      <div class="table-scroll"><table id="rank"><thead><tr><th>#</th><th>Country</th><th class="num">Index</th><th class="num">Authors</th><th>Top reason</th><th>Confidence</th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="card">
+      <h2>Worldwide picture</h2>
+      <div id="global"></div>
+    </div>
+  </section>
+
+  <section class="card prose" id="definition">
+    <h2>How we define hate</h2>
+    <p>We measure hostility toward <strong>Indians as people</strong>: people of Indian origin, including the diaspora. Criticism of the Indian government, its policies, its army, its cricket team or its films is <strong>not</strong> counted.</p>
+    <table class="def">
+      <thead><tr><th>Level</th><th>Name</th><th>Example pattern</th><th class="num">Weight</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>Neutral / critique</td><td>News, questions, praise, policy criticism</td><td class="num">0.00</td></tr>
+        <tr><td>1</td><td>Negative stereotyping</td><td>“Indians are all scammers”</td><td class="num">0.25</td></tr>
+        <tr><td>2</td><td>Contempt / slurs</td><td>Disgust, insults, slurs</td><td class="num">0.50</td></tr>
+        <tr><td>3</td><td>Dehumanisation</td><td>Animals, vermin, disease, filth</td><td class="num">0.75</td></tr>
+        <tr><td>4</td><td>Exclusion / violence</td><td>Deport, ban, expel, attack</td><td class="num">1.00</td></tr>
+      </tbody>
+    </table>
+    <h3>What gets thrown out</h3>
+    <ul>
+      <li><strong>Sarcasm is excluded entirely</strong>, from both the count of hateful posts and the total. Signals: <code>/s</code>, “yeah right”, “sure, because…”, “said no one ever”, irony emoji (🙄 🙃 😏 🤡) on otherwise positive wording, and scare-quoted stereotypes. The share removed is shown for every country.</li>
+      <li><strong>Counter-speech</strong> (“it’s racist to say Indians smell”) and reporting about racism count as non-hateful.</li>
+      <li><strong>Negations</strong> (“not all Indians…”, “Indians aren’t scammers”) don’t count as endorsing the stereotype.</li>
+    </ul>
+    <h3>From posts to a country score</h3>
+    <ol>
+      <li>Each post gets the weight of the highest level it reaches.</li>
+      <li><strong>Each person counts once.</strong> We average each author’s posts first, so one account spamming 500 slurs counts as one person.</li>
+      <li>Country score = mean author score × 100.</li>
+      <li>Small samples are pulled toward the global average: <code>(n·raw + 30·global) / (n + 30)</code>.</li>
+      <li>Confidence: low (&lt; 50 authors), medium (&lt; 300), high (≥ 300).</li>
+    </ol>
+  </section>
+
+  <section class="card prose" id="drivers">
+    <h2>Why people come to hate a racial group</h2>
+    <p>These drivers recur in research on prejudice (Allport, integrated threat theory, realistic conflict theory, social identity theory). The index’s “reasons” come from them.</p>
+    <div class="drivers">
+      <div><b>Economic competition</b><span>Jobs, wages, housing, services. Peaks in downturns.</span></div>
+      <div><b>Cultural / symbolic threat</b><span>Food, religion, language framed as a threat to “our way of life”.</span></div>
+      <div><b>Demographic anxiety</b><span>“Too many of them”, “invasion”, “replacement”.</span></div>
+      <div><b>In-group favouritism</b><span>Out-groups judged by their worst members.</span></div>
+      <div><b>Low or skewed contact</b><span>Views formed from memes and news, not people.</span></div>
+      <div><b>Scapegoating</b><span>A visible minority blamed for broad problems.</span></div>
+      <div><b>Meme &amp; media amplification</b><span>One viral clip becomes “what they’re all like”.</span></div>
+      <div><b>Political rhetoric</b><span>Hostility normalised for votes or engagement.</span></div>
+      <div><b>Historical / geopolitical conflict</b><span>Rivalries spill onto ordinary people.</span></div>
+      <div><b>Status &amp; hierarchy</b><span>Colourism, class contempt, resentment of success.</span></div>
+      <div><b>Disgust-based prejudice</b><span>Hygiene and smell tropes: viral and dehumanising.</span></div>
+      <div><b>Fear of crime &amp; fraud</b><span>Some members’ crimes generalised to everyone.</span></div>
+    </div>
+  </section>
+
+  <section class="card prose" id="sentiment">
+    <h2>The common feeling toward Indians online</h2>
+    <p>Indians are one of the largest and most visible migrant groups online, with a diaspora of about 35 million and a huge domestic internet population. Reporting and research since 2023 point to a consistent pattern:</p>
+    <ul>
+      <li><strong>A sharp rise in anti-Indian content</strong> on X, Reddit and 4chan, including slurs such as “pajeet” and recycled meme formats. Spikes follow H-1B debates in the US and immigration and student-visa debates in Canada, the UK and Australia.</li>
+      <li><strong>Jobs and immigration</strong> are the dominant frame in English-speaking countries: H-1B and “Indians hiring Indians” in the US, international students and housing in Canada, overall migration levels in the UK and Australia.</li>
+      <li><strong>Disgust memes</strong> about street defecation, smell and street food are the most viral strand and the most dehumanising.</li>
+      <li><strong>Scam stereotypes</strong> are fuelled by real call-centre fraud, then generalised to all Indians.</li>
+      <li><strong>Gendered tropes:</strong> Indian men as sexually aggressive (“bobs and vegana” spam).</li>
+      <li><strong>Regional rivalry</strong> with Pakistan and Bangladesh, and resentment of Indian influence in some neighbouring countries.</li>
+      <li><strong>The Gulf</strong> shows a different pattern: class contempt toward low-wage workers rather than “replacement” rhetoric.</li>
+      <li><strong>Counter-currents:</strong> most conversation about Indians is neutral or positive (tech leaders, food, cricket, film). A lot of the hostility comes from a small number of very active accounts, which is why we count people, not posts.</li>
+    </ul>
+  </section>
+
+  <section class="card prose" id="stereotypes">
+    <h2>Common stereotypes, and the reality</h2>
+    <p class="muted">The classifier tags each of these. They are listed so they can be recognised and measured, not because they’re true.</p>
+    <div class="table-scroll"><table class="def">
+      <thead><tr><th>Stereotype</th><th>Reality</th></tr></thead>
+      <tbody>
+        <tr><td>Indians smell / smell of curry</td><td>Smell slurs have targeted almost every migrant group (Italians, Irish, Chinese). Cooking aromas aren’t body odour.</td></tr>
+        <tr><td>Indians are dirty / defecate in the street</td><td>Rural open defecation was an infrastructure problem and fell sharply after 2014. It says nothing about migrants abroad.</td></tr>
+        <tr><td>Indians are scammers</td><td>Organised call-centre fraud is prosecuted in India too, and Indians are among its victims. It’s the work of a tiny criminal fraction.</td></tr>
+        <tr><td>Indians take our jobs / abuse H-1B</td><td>Host governments design and cap visa programmes. Holders are legally hired, mostly in shortage fields.</td></tr>
+        <tr><td>Indians only hire other Indians</td><td>Network hiring happens in every community. Real discrimination is individual misconduct covered by law.</td></tr>
+        <tr><td>Indians are overrunning / invading</td><td>Replacement rhetoric. Indians are a single-digit share of the population in every Western country.</td></tr>
+        <tr><td>Indian men are creeps</td><td>Driven by viral spam and a handful of cases. Harassment exists in every society.</td></tr>
+        <tr><td>Indians are cheap / stingy</td><td>The same trope has been aimed at Scots, Jews and Chinese people. Often it’s just high savings rates.</td></tr>
+        <tr><td>Indians are poor / third world</td><td>India is a top-five economy, and the diaspora is among the highest-earning groups in several countries.</td></tr>
+        <tr><td>Indians worship cows / are superstitious</td><td>Mockery of religious practice. Every faith looks strange from outside.</td></tr>
+        <tr><td>Indians are all tech support / IT</td><td>The diaspora spans medicine, law, business, trades and the arts.</td></tr>
+        <tr><td>Indians are loud / rude</td><td>Norms vary by culture and person. The same trope is applied to many groups.</td></tr>
+        <tr><td>Indians are bad drivers</td><td>A generic immigrant stereotype with no group-level evidence.</td></tr>
+        <tr><td>Indian degrees / doctors are fake</td><td>Indian-trained professionals pass the same host-country licensing exams.</td></tr>
+        <tr><td>Regional / geopolitical hostility</td><td>Disputes between states get turned into contempt for ordinary people.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="card prose" id="sources">
+    <h2>Sources &amp; limits</h2>
+    <p>Only public data that needs no login or API key. Collection runs daily on GitHub Actions, and usernames are hashed before storage.</p>
+    <div class="table-scroll"><table id="sources-table" class="def"><thead><tr><th>Source</th><th>Location from</th><th class="num">Posts stored</th><th>Last run</th></tr></thead><tbody></tbody></table></div>
+    <ul>
+      <li>This measures people who <em>post online in English</em> about Indians. It is not a poll of a country’s population.</li>
+      <li>Geolocation is imperfect: VPNs, the diaspora and bots all blur it.</li>
+      <li>The classifier is rule-based and transparent. It misses coded language and misreads some context, so treat the breakdowns as signals, not verdicts.</li>
+    </ul>
+  </section>
+</main>
+
+<footer class="wrap muted small">Open source · <a href="https://github.com/FilthyL/hateindex">github.com/FilthyL/hateindex</a></footer>
+
+<script src="vendor/d3.min.js"></script>
+<script src="vendor/topojson-client.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
