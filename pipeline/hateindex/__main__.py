@@ -9,6 +9,7 @@ import gzip
 import json
 import os
 import sys
+import time
 import traceback
 from datetime import datetime, timedelta, timezone
 
@@ -25,6 +26,9 @@ STATUS = os.path.join(ROOT, "data", "source_status.json")
 INTERVALS = {"reddit": 7.0, "4chan": 1.1, "gdelt": 6.0, "google_news": 2.0, "hackernews": 0.5,
              "mastodon": 1.0, "bluesky": 1.0, "medium": 2.0, "wordpress": 1.0}
 DEFAULT_SOURCES = list(C.COLLECTORS)
+# Max seconds per source per run, so one slow or unreachable site can't eat the job.
+BUDGET = {"gdelt": 900, "reddit": 900}
+DEFAULT_BUDGET = 600
 
 
 def _path(source):
@@ -54,7 +58,8 @@ def collect(sources, retention_days, cap):
         existing = load(name)
         seen = {r["id"] for r in existing}
         new, err = [], None
-        f = C.Fetcher(min_interval=INTERVALS.get(name, 1.0))
+        started = time.time()
+        f = C.Fetcher(min_interval=INTERVALS.get(name, 1.0), deadline=started + BUDGET.get(name, DEFAULT_BUDGET))
         try:
             for rec in C.COLLECTORS[name](f):
                 if rec["id"] in seen or not rec.get("text"):
@@ -64,14 +69,20 @@ def collect(sources, retention_days, cap):
                 new.append(rec)
                 if len(new) >= cap:
                     break
+        except C.BudgetExceeded:
+            err = None
+            print(f"[{name}] time budget reached; keeping partial results", flush=True)
         except Exception as e:  # keep whatever we got before the failure
             err = f"{type(e).__name__}: {e}"[:300]
             if not str(e).startswith("skipped"):
                 traceback.print_exc(limit=1)
+        if err is None and not new and f._dead:
+            err = "no data; unreachable: " + ", ".join(sorted(f._dead))[:250]
         kept = [r for r in existing if r.get("collected", "") >= cutoff] + new
         save(name, kept)
         status[name] = {"last_run": now.isoformat(timespec="seconds"), "new": len(new), "stored": len(kept),
-                        "ok": err is None, "error": err}
+                        "ok": err is None, "error": err,
+                        "seconds": round(time.time() - started)}
         print(f"[{name}] +{len(new)} new, {len(kept)} stored" + (f"  ERROR {err}" if err else ""), flush=True)
     os.makedirs(os.path.dirname(STATUS), exist_ok=True)
     json.dump(status, open(STATUS, "w"), indent=2)

@@ -31,6 +31,10 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Use the latest commit
+        # a run can sit queued behind a long collection; build from the newest data, not a stale checkout
+        run: git pull --ff-only origin "${GITHUB_REF_NAME}" || true
+
       - name: Test classifier
         run: cd pipeline && python -m unittest discover -s tests -v
 

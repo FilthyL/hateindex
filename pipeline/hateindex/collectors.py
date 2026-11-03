@@ -30,21 +30,46 @@ def author_hash(source, raw):
     return hashlib.sha256(f"{SALT}:{source}:{raw}".encode()).hexdigest()[:16]
 
 
+class BudgetExceeded(BaseException):
+    """A source ran out of its time budget.
+
+    Derives from BaseException on purpose: collectors swallow ordinary
+    exceptions per request (one bad URL shouldn't end a source), but running
+    out of time must stop the whole source.
+    """
+
+
+class HostDown(Exception):
+    pass
+
+
 class Fetcher:
-    def __init__(self, min_interval=1.0, timeout=30, retries=3):
-        self.min_interval, self.timeout, self.retries = min_interval, timeout, retries
+    def __init__(self, min_interval=1.0, timeout=20, retries=2, deadline=None):
+        self.min_interval, self.timeout, self.retries, self.deadline = min_interval, timeout, retries, deadline
         self._last = {}
+        self._dead = set()  # hosts that stopped answering; don't keep waiting on them
+
+    def _check_budget(self):
+        if self.deadline and time.time() >= self.deadline:
+            raise BudgetExceeded("time budget reached")
 
     def get(self, url, headers=None, as_json=True):
         host = urllib.parse.urlparse(url).netloc
+        if host in self._dead:
+            raise HostDown(host)
+        self._check_budget()
         wait = self.min_interval - (time.time() - self._last.get(host, 0))
         if wait > 0:
             time.sleep(wait)
         req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*", **(headers or {})})
         err = None
         for attempt in range(self.retries):
+            self._check_budget()
+            timeout = self.timeout
+            if self.deadline:
+                timeout = max(1, min(timeout, self.deadline - time.time()))
             try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                with urllib.request.urlopen(req, timeout=timeout) as resp:
                     self._last[host] = time.time()
                     data = resp.read()
                     return json.loads(data) if as_json else data.decode("utf-8", "replace")
@@ -55,9 +80,13 @@ class Fetcher:
                     time.sleep(2 ** (attempt + 2))
                     continue
                 raise
-            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
+            except json.JSONDecodeError as e:
+                raise e
+            except (urllib.error.URLError, TimeoutError, OSError) as e:
                 err = e
-                time.sleep(2 ** (attempt + 1))
+                time.sleep(2 ** attempt)
+        if not isinstance(err, urllib.error.HTTPError):
+            self._dead.add(host)
         raise err
 
 
@@ -169,13 +198,13 @@ GDELT_FIPS = {
 
 
 def gdelt(f, timespan="3months"):
-    f_slow = Fetcher(min_interval=6.0, timeout=60)  # GDELT asks for ≤1 request / 5 s
+    f.min_interval = max(f.min_interval, 6.0)  # GDELT asks for ≤1 request / 5 s
     q = '(indians OR "indian immigrants" OR "indian students" OR "indian workers" OR "anti-indian")'
     for fips, cc in GDELT_FIPS.items():
         params = urllib.parse.urlencode({"query": f"{q} sourcecountry:{fips} sourcelang:english", "mode": "artlist",
                                          "format": "json", "maxrecords": 250, "timespan": timespan, "sort": "hybridrel"})
         try:
-            data = f_slow.get(f"https://api.gdeltproject.org/api/v2/doc/doc?{params}")
+            data = f.get(f"https://api.gdeltproject.org/api/v2/doc/doc?{params}")
         except Exception:
             continue
         for a in data.get("articles", []) if isinstance(data, dict) else []:

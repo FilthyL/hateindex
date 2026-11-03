@@ -62,5 +62,24 @@ class Aggregate(unittest.TestCase):
         self.assertNotIn("GB", out["countries"])               # only post was sarcasm
 
 
+
+class FetcherLimits(unittest.TestCase):
+    def test_budget_exceeded(self):
+        import time
+        f = C.Fetcher(deadline=time.time() - 1)
+        with self.assertRaises(C.BudgetExceeded):
+            f.get("https://example.invalid/x")
+
+    def test_budget_not_swallowed_by_collectors(self):
+        # collectors catch Exception per request; the budget must still stop them
+        self.assertFalse(issubclass(C.BudgetExceeded, Exception))
+
+    def test_dead_host_skipped(self):
+        f = C.Fetcher(timeout=1, retries=1)
+        f._dead.add("down.example")
+        with self.assertRaises(C.HostDown):
+            f.get("https://down.example/api")
+
+
 if __name__ == "__main__":
     unittest.main()
