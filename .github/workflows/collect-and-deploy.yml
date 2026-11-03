@@ -1,0 +1,74 @@
+name: Collect data and deploy site
+
+on:
+  schedule:
+    - cron: "17 3 * * *"   # daily, 03:17 UTC
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: "Comma-separated sources (blank = all)"
+        required: false
+        default: ""
+  push:
+    paths: ["site/**", "pipeline/**", ".github/workflows/**"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: hateindex
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test classifier
+        run: cd pipeline && python -m unittest discover -s tests -v
+
+      - name: Collect public data
+        if: github.event_name != 'push'
+        env:
+          HATEINDEX_SALT: ${{ secrets.HATEINDEX_SALT }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+        run: |
+          if [ -n "${{ github.event.inputs.sources }}" ]; then
+            python -m pipeline.hateindex collect --sources "${{ github.event.inputs.sources }}"
+          else
+            python -m pipeline.hateindex collect
+          fi
+
+      - name: Build index
+        run: python -m pipeline.hateindex build
+
+      - name: Commit data
+        if: github.event_name != 'push'
+        run: |
+          git config user.name "hateindex-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data site/data
+          git diff --cached --quiet || git commit -m "Update data $(date -u +%F)"
+          git push
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: collect
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

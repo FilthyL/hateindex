@@ -89,10 +89,19 @@ REDDIT_SUBS = {
 
 
 def reddit(f, max_threads_per_sub=8, subs=None):
-    for sub, cc in (subs or REDDIT_SUBS).items():
+    subs = subs or REDDIT_SUBS
+    consecutive_fail = 0
+    for sub, cc in subs.items():
         q = urllib.parse.quote("indian OR indians OR desi OR pajeet")
         url = f"https://www.reddit.com/r/{sub}/search.json?q={q}&restrict_sr=1&sort=relevance&t=year&limit=50"
-        listing = f.get(url)
+        try:
+            listing = f.get(url)
+            consecutive_fail = 0
+        except Exception as e:  # one blocked/private sub shouldn't stop the rest...
+            consecutive_fail += 1
+            if consecutive_fail >= 5:  # ...but five in a row means we're being blocked
+                raise RuntimeError(f"reddit appears to block unauthenticated requests: {e}") from e
+            continue
         posts = [c["data"] for c in listing.get("data", {}).get("children", [])]
         for p in posts:
             yield _reddit_rec(p, sub, cc, p.get("title", "") + "\n" + p.get("selftext", ""), "", p.get("permalink"))
