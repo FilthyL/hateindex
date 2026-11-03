@@ -63,6 +63,23 @@ class Aggregate(unittest.TestCase):
 
 
 
+class Gdelt(unittest.TestCase):
+    def test_plain_text_error_is_reported(self):
+        f = FakeFetcher({"https://api.gdeltproject.org/": "Please limit requests to one every 5 seconds"})
+        f.min_interval = 0
+        with self.assertRaisesRegex(RuntimeError, "limit requests"):
+            list(C.gdelt(f))
+
+    def test_articles_parsed(self):
+        import json
+        body = json.dumps({"articles": [{"url": "https://x.example/a", "title": "Indians are all scammers", "domain": "x.example"}]})
+        f = FakeFetcher({"https://api.gdeltproject.org/": body})
+        f.min_interval = 0
+        recs = list(C.gdelt(f))
+        self.assertEqual(recs[0]["country"], "US")
+        self.assertEqual(recs[0]["kind"], "news")
+
+
 class FetcherLimits(unittest.TestCase):
     def test_budget_exceeded(self):
         import time

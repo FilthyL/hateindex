@@ -110,13 +110,9 @@ def classify(text: str, context: str = "") -> Result:
     if T.SLURS.search(low):
         r.slur, sev = True, 2
 
-    for sid, (_label, reason, pattern) in T.STEREOTYPES.items():
-        if pattern.search(scope) and (generalises or r.slur):
-            r.stereotypes.append(sid)
-            if reason not in r.reasons:
-                r.reasons.append(reason)
-
-    if r.stereotypes and not r.negated:
+    can_attribute = generalises or r.slur
+    claims = [sid for sid, rxc in T.CLAIMS.items() if can_attribute and rxc.search(scope)]
+    if claims and not r.negated:
         sev = max(sev, 1)
     if T.CONTEMPT.search(scope) and (generalises or r.slur):
         sev = max(sev, 2)
@@ -126,6 +122,15 @@ def classify(text: str, context: str = "") -> Result:
         sev = 4
         if "immigration" not in r.reasons:
             r.reasons.append("immigration")
+
+    # Tag what the hostility is about: loaded claims always, topic words only
+    # once the post is already hostile.
+    if sev > 0:
+        for sid, (_label, reason, pattern) in T.STEREOTYPES.items():
+            if sid in claims or pattern.search(scope):
+                r.stereotypes.append(sid)
+                if reason not in r.reasons:
+                    r.reasons.append(reason)
 
     if r.negated and sev <= 1:
         sev = 0

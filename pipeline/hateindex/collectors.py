@@ -199,18 +199,31 @@ GDELT_FIPS = {
 
 def gdelt(f, timespan="3months"):
     f.min_interval = max(f.min_interval, 6.0)  # GDELT asks for ≤1 request / 5 s
-    q = '(indians OR "indian immigrants" OR "indian students" OR "indian workers" OR "anti-indian")'
+    q = '(indians OR "indian immigrants" OR "indian students" OR "indian workers")'
+    got, last_problem = 0, None
     for fips, cc in GDELT_FIPS.items():
         params = urllib.parse.urlencode({"query": f"{q} sourcecountry:{fips} sourcelang:english", "mode": "artlist",
                                          "format": "json", "maxrecords": 250, "timespan": timespan, "sort": "hybridrel"})
         try:
-            data = f.get(f"https://api.gdeltproject.org/api/v2/doc/doc?{params}")
-        except Exception:
+            # GDELT answers errors and rate limits in plain text, so parse JSON ourselves
+            body = f.get(f"https://api.gdeltproject.org/api/v2/doc/doc?{params}", as_json=False)
+        except HostDown:
+            break
+        except Exception as e:
+            last_problem = f"{type(e).__name__}: {e}"
             continue
-        for a in data.get("articles", []) if isinstance(data, dict) else []:
+        try:
+            data = json.loads(body) if body.strip() else {}
+        except json.JSONDecodeError:
+            last_problem = "GDELT said: " + " ".join(body.split())[:200]
+            continue
+        for a in data.get("articles", []):
+            got += 1
             yield {"id": f"gdelt:{hashlib.sha1(a['url'].encode()).hexdigest()[:16]}", "source": "gdelt", "kind": "news",
                    "country": cc, "author": author_hash("gdelt", a.get("domain", "")), "text": a.get("title", ""),
                    "context": "", "url": a["url"], "created": a.get("seendate")}
+    if not got and last_problem:
+        raise RuntimeError(last_problem)
 
 
 # ---------------------------------------------------------- Google News -----

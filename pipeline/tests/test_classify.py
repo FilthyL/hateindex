@@ -58,6 +58,27 @@ class Severity(unittest.TestCase):
         self.assertEqual(r.severity, 4)
 
 
+class RealWorldFalsePositives(unittest.TestCase):
+    """Neutral posts from the first real collection that the old rules flagged."""
+    CASES = [
+        ">H1b Indians are on 30-50 yr queues for green card. What do you mean by this?",
+        "This is after increasing the repatriation tax that H1-B workers pay on the sum they're sending home for Indians only",
+        "One thing is a lot of Indians got GC's in EB-1 in the last decade. Some Indian IT outsourcing firms promoted people",
+        "If it's a choice between Wikipedia and Facebook, or nothing at all, telling poor Indians they should only have the latter seems cruel.",
+        "I am not going to tolerate your vile, racist shit about being overrun and indians bring disease",
+        "Their way is warlike because they have their roots as foot indians, and over-hunted animals in the forest",
+        'Their way is warlike because they have their roots as "foot" indians, and over-hunted animals',
+        "The fact that prevalence of heart disease is nearly invariant between Indians in India and Indians in the US",
+        "After 'Pajeet,' new racist slur targets Indian women in US",
+        "Their queue is impossibly long. There are just too many Indians applicants and not enough seats.",
+    ]
+
+    def test_not_hateful(self):
+        for text in self.CASES:
+            with self.subTest(text=text[:40]):
+                self.assertEqual(classify(text).severity, 0)
+
+
 class Exclusions(unittest.TestCase):
     def test_sarcasm_marker(self):
         r = classify("Yeah right, Indians are the reason your rent is high /s")
