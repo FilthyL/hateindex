@@ -49,6 +49,57 @@ class Collectors(unittest.TestCase):
         self.assertEqual(recs[1]["context"], "Indians are all scammers")
 
 
+class FourchanIncremental(unittest.TestCase):
+    CAT = [{"threads": [{"no": 7, "sub": "cats", "com": "post cats", "last_modified": 100}]}]
+    OFFTOPIC = {"posts": [
+        {"no": 7, "id": "a", "country": "US", "com": "post cats"},
+        {"no": 8, "id": "b", "country": "GB", "com": "jeets ruin every thread"},
+        {"no": 9, "id": "c", "country": "DE", "com": "nice cat"},
+    ]}
+
+    def fetcher(self):
+        return FakeFetcher({"https://a.4cdn.org/pol/catalog.json": self.CAT,
+                            "https://a.4cdn.org/pol/thread/7.json": self.OFFTOPIC})
+
+    def test_offtopic_thread_keeps_only_matching_posts(self):
+        recs = list(C.fourchan(self.fetcher(), boards=("pol",), state={}))
+        self.assertEqual([r["country"] for r in recs], ["GB"])
+        self.assertEqual(recs[0]["context"], "")
+
+    def test_unchanged_thread_not_refetched(self):
+        state = {}
+        list(C.fourchan(self.fetcher(), boards=("pol",), state=state))
+        self.assertEqual(state["pol"]["7"], 100)
+        f = FakeFetcher({"https://a.4cdn.org/pol/catalog.json": self.CAT})  # thread URL would raise
+        self.assertEqual(list(C.fourchan(f, boards=("pol",), state=state)), [])
+
+    def test_dead_threads_forgotten(self):
+        state = {"pol": {"1": 5}}
+        list(C.fourchan(self.fetcher(), boards=("pol",), state=state))
+        self.assertNotIn("1", state["pol"])
+
+
+class RedditFallback(unittest.TestCase):
+    def test_pullpush_when_blocked(self):
+        import urllib.error
+
+        class F(FakeFetcher):
+            def get(self, url, headers=None, as_json=True):
+                if url.startswith("https://www.reddit.com/"):
+                    raise urllib.error.HTTPError(url, 403, "Blocked", {}, None)
+                return super().get(url, headers, as_json)
+
+        body = {"data": [{"id": "c1", "body": "Indians are all scammers", "author": "u", "created_utc": 1700000500,
+                          "permalink": "/r/canada/c1"}]}
+        f = F({"https://api.pullpush.io/": body})
+        f.min_interval = 0
+        state = {}
+        recs = list(C.reddit(f, subs={f"s{i}": "CA" for i in range(5)}, state=state))
+        self.assertTrue(recs)
+        self.assertEqual(recs[0]["country"], "CA")
+        self.assertEqual(state["s0:comment"], 1700000500)
+
+
 class Aggregate(unittest.TestCase):
     def test_build(self):
         f = FakeFetcher({"https://a.4cdn.org/pol/catalog.json": CATALOG, "https://a.4cdn.org/pol/thread/1.json": THREAD})

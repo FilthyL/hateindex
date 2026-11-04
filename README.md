@@ -11,15 +11,15 @@ country on the map to see its breakdown.
 ## How it works
 
 ```
-public sources ──► collectors ──► data/raw/*.jsonl.gz ──► classifier ──► per-author averages ──► site/data/index.json ──► map
+public sources ──► collectors ──► data/raw/*.jsonl.gz (data branch) ──► classifier ──► per-author averages ──► site/data/index.json ──► map
 ```
 
 1. **Collect** (`pipeline/hateindex/collectors.py`): keyless public sources only.
 
    | Source | Type | Country from |
    |---|---|---|
-   | 4chan /pol/, /int/, /bant/ (official API) | social | IP-based post flag |
-   | Reddit (public JSON, ~60 country subreddits) | social | subreddit |
+   | 4chan /pol/, /int/, /bant/, /sp/ (official API; every changed live thread, hourly) | social | IP-based post flag |
+   | Reddit (~60 country subreddits; public JSON, or [PullPush](https://pullpush.io) when reddit.com blocks) | social | subreddit |
    | Mastodon (public tag timelines) | social | instance (local accounts only) |
    | Hacker News (Algolia API) | social | — (global only) |
    | Bluesky (public AppView search) | social | — (global only) |
@@ -68,8 +68,10 @@ Only the Python 3.10+ standard library is needed.
 
 ## Deploy (GitHub Pages)
 
-The workflow `.github/workflows/collect-and-deploy.yml` runs daily. It collects,
-rebuilds the index, commits the data back, and deploys `site/` to Pages.
+The workflow `.github/workflows/collect-and-deploy.yml` runs **hourly**. It collects,
+rebuilds the index and deploys `site/` to Pages. Raw posts and collector progress
+are saved to the `data` branch as a single commit that's overwritten each run, so
+`main`'s history doesn't fill up with data.
 
 1. Repo **Settings → Pages → Source: GitHub Actions**.
 2. Optional: add a `HATEINDEX_SALT` secret (any random string) for the author hashes.
