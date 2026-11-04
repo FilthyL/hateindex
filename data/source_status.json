@@ -1,79 +1,90 @@
 {
   "reddit": {
-    "last_run": "2026-11-03T20:22:47+00:00",
+    "last_run": "2026-11-04T10:58:33+00:00",
     "new": 0,
     "stored": 0,
     "ok": false,
-    "error": "RuntimeError: reddit appears to block unauthenticated requests: HTTP Error 403: Blocked"
+    "error": "RuntimeError: reddit appears to block unauthenticated requests: HTTP Error 403: Blocked",
+    "seconds": 28
   },
   "4chan": {
-    "last_run": "2026-11-03T20:22:47+00:00",
-    "new": 354,
-    "stored": 354,
+    "last_run": "2026-11-04T10:58:33+00:00",
+    "new": 275,
+    "stored": 629,
     "ok": true,
-    "error": null
+    "error": null,
+    "seconds": 12
   },
   "gdelt": {
-    "last_run": "2026-11-03T20:22:47+00:00",
+    "last_run": "2026-11-04T10:58:33+00:00",
     "new": 0,
     "stored": 0,
-    "ok": true,
-    "error": null
+    "ok": false,
+    "error": "no data; unreachable: api.gdeltproject.org",
+    "seconds": 133
   },
   "google_news": {
-    "last_run": "2026-11-03T20:22:47+00:00",
-    "new": 689,
-    "stored": 689,
+    "last_run": "2026-11-04T10:58:33+00:00",
+    "new": 221,
+    "stored": 910,
     "ok": true,
-    "error": null
+    "error": null,
+    "seconds": 174
   },
   "hackernews": {
-    "last_run": "2026-11-03T20:22:47+00:00",
-    "new": 3639,
-    "stored": 3639,
+    "last_run": "2026-11-04T10:58:33+00:00",
+    "new": 41,
+    "stored": 3680,
     "ok": true,
-    "error": null
+    "error": null,
+    "seconds": 24
   },
   "mastodon": {
-    "last_run": "2026-11-03T20:22:47+00:00",
-    "new": 610,
-    "stored": 610,
+    "last_run": "2026-11-04T10:58:33+00:00",
+    "new": 59,
+    "stored": 669,
     "ok": true,
-    "error": null
+    "error": null,
+    "seconds": 110
   },
   "bluesky": {
-    "last_run": "2026-11-03T20:22:47+00:00",
-    "new": 96,
-    "stored": 96,
+    "last_run": "2026-11-04T10:58:33+00:00",
+    "new": 60,
+    "stored": 156,
     "ok": false,
-    "error": "HTTPError: HTTP Error 403: Forbidden"
+    "error": "HTTPError: HTTP Error 403: Forbidden",
+    "seconds": 1
   },
   "medium": {
-    "last_run": "2026-11-03T20:22:47+00:00",
-    "new": 60,
-    "stored": 60,
+    "last_run": "2026-11-04T10:58:33+00:00",
+    "new": 28,
+    "stored": 88,
     "ok": true,
-    "error": null
+    "error": null,
+    "seconds": 12
   },
   "wordpress": {
-    "last_run": "2026-11-03T20:22:47+00:00",
-    "new": 120,
-    "stored": 120,
+    "last_run": "2026-11-04T10:58:33+00:00",
+    "new": 32,
+    "stored": 152,
     "ok": true,
-    "error": null
+    "error": null,
+    "seconds": 34
   },
   "youtube": {
-    "last_run": "2026-11-03T20:22:47+00:00",
+    "last_run": "2026-11-04T10:58:33+00:00",
     "new": 0,
     "stored": 0,
     "ok": false,
-    "error": "RuntimeError: skipped: set YOUTUBE_API_KEY to enable"
+    "error": "RuntimeError: skipped: set YOUTUBE_API_KEY to enable",
+    "seconds": 0
   },
   "x": {
-    "last_run": "2026-11-03T20:22:47+00:00",
+    "last_run": "2026-11-04T10:58:33+00:00",
     "new": 0,
     "stored": 0,
     "ok": false,
-    "error": "RuntimeError: skipped: set X_BEARER_TOKEN to enable"
+    "error": "RuntimeError: skipped: set X_BEARER_TOKEN to enable",
+    "seconds": 0
   }
 }
