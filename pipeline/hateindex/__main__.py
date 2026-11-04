@@ -6,6 +6,7 @@
 """
 import argparse
 import gzip
+import inspect
 import json
 import os
 import sys
@@ -26,9 +27,11 @@ STATUS = os.path.join(ROOT, "data", "source_status.json")
 INTERVALS = {"reddit": 7.0, "4chan": 1.1, "gdelt": 6.0, "google_news": 2.0, "hackernews": 0.5,
              "mastodon": 1.0, "bluesky": 1.0, "medium": 2.0, "wordpress": 1.0}
 DEFAULT_SOURCES = list(C.COLLECTORS)
-# Max seconds per source per run, so one slow or unreachable site can't eat the job.
-BUDGET = {"gdelt": 900, "reddit": 900}
-DEFAULT_BUDGET = 600
+# Max seconds per source per run. Runs are hourly, so the total stays well under an hour.
+BUDGET = {"4chan": 1200, "reddit": 600, "google_news": 300, "mastodon": 300, "hackernews": 180,
+          "bluesky": 180, "gdelt": 180, "medium": 120, "wordpress": 120}
+DEFAULT_BUDGET = 120
+STATE = os.path.join(ROOT, "data", "state")
 
 
 def _path(source):
@@ -60,8 +63,13 @@ def collect(sources, retention_days, cap):
         new, err = [], None
         started = time.time()
         f = C.Fetcher(min_interval=INTERVALS.get(name, 1.0), deadline=started + BUDGET.get(name, DEFAULT_BUDGET))
+        collector = C.COLLECTORS[name]
+        state_path = os.path.join(STATE, f"{name}.json")
+        state = None
+        if "state" in inspect.signature(collector).parameters:
+            state = json.load(open(state_path)) if os.path.exists(state_path) else {}
         try:
-            for rec in C.COLLECTORS[name](f):
+            for rec in (collector(f, state=state) if state is not None else collector(f)):
                 if rec["id"] in seen or not rec.get("text"):
                     continue
                 rec["collected"] = now.isoformat(timespec="seconds")
@@ -78,6 +86,9 @@ def collect(sources, retention_days, cap):
                 traceback.print_exc(limit=1)
         if err is None and not new and f._dead:
             err = "no data; unreachable: " + ", ".join(sorted(f._dead))[:250]
+        if state is not None:
+            os.makedirs(STATE, exist_ok=True)
+            json.dump(state, open(state_path, "w"))
         kept = [r for r in existing if r.get("collected", "") >= cutoff] + new
         save(name, kept)
         status[name] = {"last_run": now.isoformat(timespec="seconds"), "new": len(new), "stored": len(kept),

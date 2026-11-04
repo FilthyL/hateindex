@@ -44,6 +44,10 @@
       .attr("width", 5).attr("height", 5).attr("patternTransform", "rotate(45)");
     pat.append("rect").attr("width", 5).attr("height", 5).attr("class", "hatch-bg");
     pat.append("line").attr("x1", 0).attr("y1", 0).attr("x2", 0).attr("y2", 5).attr("class", "hatch-ln").attr("stroke-width", 1.4);
+    // "some data, not enough to score": dots, so it reads differently from "no data"
+    const dots = defs.append("pattern").attr("id", "dots").attr("patternUnits", "userSpaceOnUse").attr("width", 4).attr("height", 4);
+    dots.append("rect").attr("width", 4).attr("height", 4).attr("class", "hatch-bg");
+    dots.append("circle").attr("cx", 2).attr("cy", 2).attr("r", 0.9).attr("class", "dot");
     const g = svg.append("g");
     g.append("path").datum({ type: "Sphere" }).attr("class", "sphere").attr("d", path);
     paths = g.selectAll("path.country").data(countries).join("path").attr("class", "country").attr("d", path)
@@ -60,11 +64,15 @@
     if (!paths) return;
     d3.select(".hatch-bg").attr("fill", css("--nodata"));
     d3.select(".hatch-ln").attr("stroke", css("--surface"));
+    d3.selectAll(".hatch-bg").attr("fill", css("--nodata"));
+    d3.selectAll(".dot").attr("fill", css("--r4"));
     paths.each(function (d) {
       const c = byNum.get(String(d.id).padStart(3, "0"));
       const s = stat(c);
       const has = s && s.confidence !== "insufficient" && s.index != null;
-      this.classList.toggle("nodata", !has);
+      const thin = !has && s && s.authors > 0;
+      this.classList.toggle("nodata", !has && !thin);
+      this.classList.toggle("thin", thin);
       this.style.fill = has ? css(RAMP[bin(s.index)]) : "";
       this.setAttribute("aria-label", `${c ? c.name : d.properties.name}: ${has ? s.index.toFixed(1) : "no data"}`);
     });
@@ -77,7 +85,8 @@
       `<span>Hate index</span>
        <div><div class="ramp">${RAMP.map((v) => `<span class="sw" style="background:${css(v)}"></span>`).join("")}</div>
        <div class="ticks">${ticks.map((t, i) => `<span>${i === ticks.length - 1 ? t + "+" : t}</span>`).join("")}</div></div>
-       <span class="ramp"><span class="nd"></span>&nbsp;Not enough data</span>`;
+       <span class="ramp"><span class="nd thin-sw"></span>&nbsp;Some data (under 10 people)</span>
+       <span class="ramp"><span class="nd"></span>&nbsp;No data yet</span>`;
   }
 
   // ---------- tooltip ----------

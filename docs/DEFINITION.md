@@ -61,8 +61,8 @@ can see how much was dropped.
 
 | Source | How a country is assigned |
 |---|---|
-| 4chan /pol/, /int/ | The country flag the board shows on each post (IP-based) |
-| Reddit | The country subreddit it was posted in (r/canada → Canada, …) |
+| 4chan /pol/, /int/, /bant/, /sp/ | The country flag the board shows on each post (IP-based) |
+| Reddit (direct or via PullPush) | The country subreddit it was posted in (r/canada → Canada, …) |
 | GDELT news | The country of the news outlet |
 | Google News RSS | The country edition the article was listed in |
 | Mastodon | The country of the instance, where it has one |

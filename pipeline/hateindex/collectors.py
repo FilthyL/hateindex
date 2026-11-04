@@ -117,8 +117,22 @@ REDDIT_SUBS = {
 }
 
 
-def reddit(f, max_threads_per_sub=8, subs=None):
+def reddit(f, max_threads_per_sub=8, subs=None, state=None):
     subs = subs or REDDIT_SUBS
+    try:
+        yield from _reddit_direct(f, max_threads_per_sub, subs)
+    except RuntimeError as blocked:
+        # reddit.com blocks unauthenticated requests from cloud IPs; PullPush
+        # mirrors public Reddit posts and needs no key.
+        got = 0
+        for rec in _reddit_pullpush(f, subs, state if state is not None else {}):
+            got += 1
+            yield rec
+        if not got:
+            raise RuntimeError(f"{blocked}; PullPush fallback returned nothing") from blocked
+
+
+def _reddit_direct(f, max_threads_per_sub, subs):
     consecutive_fail = 0
     for sub, cc in subs.items():
         q = urllib.parse.quote("indian OR indians OR desi OR pajeet")
@@ -152,6 +166,33 @@ def reddit(f, max_threads_per_sub=8, subs=None):
                     stack.extend(rep["data"]["children"])
 
 
+def _reddit_pullpush(f, subs, state):
+    """PullPush search, newest first, picking up after the newest item already stored."""
+    f.min_interval = max(f.min_interval, 2.0)
+    for sub, cc in subs.items():
+        for kind in ("comment", "submission"):
+            key = f"{sub}:{kind}"
+            params = {"q": "indians|indian|desi|pajeet|jeet", "subreddit": sub, "size": 100, "sort": "desc"}
+            if state.get(key):
+                params["after"] = state[key]
+            try:
+                data = f.get("https://api.pullpush.io/reddit/search/" + kind + "/?" + urllib.parse.urlencode(params))
+            except HostDown:
+                raise
+            except Exception:
+                continue
+            items = data.get("data", []) if isinstance(data, dict) else []
+            for d in items:
+                if kind == "comment":
+                    text, perma = d.get("body", ""), d.get("permalink")
+                else:
+                    text, perma = d.get("title", "") + "\n" + d.get("selftext", ""), d.get("permalink")
+                d.setdefault("name", ("t1_" if kind == "comment" else "t3_") + str(d.get("id")))
+                yield _reddit_rec(d, sub, cc, text, "", perma)
+            if items:
+                state[key] = max(int(d.get("created_utc", 0)) for d in items)
+
+
 def _reddit_rec(d, sub, cc, text, ctx, permalink):
     return {"id": f"reddit:{d.get('name') or d.get('id')}", "source": "reddit", "kind": "social", "country": cc,
             "author": author_hash("reddit", d.get("author", "")), "text": text, "context": ctx,
@@ -164,25 +205,50 @@ def _reddit_rec(d, sub, cc, text, ctx, permalink):
 CHAN_TERMS = re.compile(r"\b(?:indians?|desis?|pajeets?|jeets?|saa+r|curry|poo in loo|street shitt?ers?|h-?1b)\b", re.I)
 
 
-def fourchan(f, boards=("pol", "int", "bant")):
+CHAN_BAD_FLAGS = {"XX", "A1", "A2", "EU"}
+
+
+def fourchan(f, boards=("pol", "int", "bant", "sp"), state=None):
+    """Read every live thread that changed since the last run.
+
+    Threads whose subject is about Indians are kept whole (each reply gets
+    the subject as context). In every other thread, only posts that
+    mention Indians are kept. `state` remembers each thread's last_modified
+    time so an hourly run only refetches threads with new replies.
+    """
+    state = state if state is not None else {}
     for board in boards:
+        seen = state.setdefault(board, {})
         catalog = f.get(f"https://a.4cdn.org/{board}/catalog.json")
         threads = [t for page in catalog for t in page.get("threads", [])]
-        hits = [t for t in threads if CHAN_TERMS.search(f"{t.get('sub', '')} {t.get('com', '')}")]
-        for t in hits:
+        live = {str(t["no"]) for t in threads}
+        for no in list(seen):          # forget threads that have died
+            if no not in live:
+                del seen[no]
+        # threads about Indians first, so they're covered even if the budget runs out
+        threads.sort(key=lambda t: not CHAN_TERMS.search(f"{t.get('sub', '')} {t.get('com', '')}"))
+        for t in threads:
+            key, mod = str(t["no"]), t.get("last_modified", 0)
+            if seen.get(key) == mod:
+                continue
             try:
                 data = f.get(f"https://a.4cdn.org/{board}/thread/{t['no']}.json")
+            except HostDown:
+                raise
             except Exception:
                 continue
+            seen[key] = mod
             ctx = f"{t.get('sub', '')} {t.get('com', '')}"
+            thread_on_topic = bool(CHAN_TERMS.search(ctx))
             for p in data.get("posts", []):
-                cc = p.get("country")  # absent for troll/meme flags, which we ignore
-                if not p.get("com"):
+                com = p.get("com")
+                if not com or not (thread_on_topic or CHAN_TERMS.search(com)):
                     continue
+                cc = p.get("country")  # absent for troll/meme flags, which we ignore
                 yield {"id": f"4chan:{board}:{p['no']}", "source": "4chan", "kind": "social",
-                       "country": cc if cc and cc not in ("XX", "A1", "A2", "EU") else None,
+                       "country": cc if cc and cc not in CHAN_BAD_FLAGS else None,
                        "author": author_hash("4chan", f"{t['no']}:{p.get('id', p['no'])}"),
-                       "text": p["com"], "context": "" if p["no"] == t["no"] else ctx,
+                       "text": com, "context": ctx if thread_on_topic and p["no"] != t["no"] else "",
                        "url": f"https://boards.4chan.org/{board}/thread/{t['no']}#p{p['no']}", "created": _iso(p.get("time"))}
 
 
@@ -268,6 +334,9 @@ MASTODON_INSTANCES = {
     "mastodon.social": None, "mastodon.online": None, "mstdn.social": None, "mas.to": None,
     "mstdn.ca": "CA", "mastodon.scot": "GB", "mastodon.org.uk": "GB", "aus.social": "AU", "mastodon.nz": "NZ",
     "mastodon.ie": "IE", "sfba.social": "US", "mastodon.sg": "SG", "mastodon.africa": None,
+    "mastodon.au": "AU", "toot.wales": "GB", "mastodon.london": "GB", "mastodon.nyc": "US", "mastodon.texas": "US",
+    "masto.nyc": "US", "mstdn.science": None, "mastodon.uno": "IT", "mastodon.nl": "NL", "det.social": "DE",
+    "masto.pt": "PT", "mastodon.za": "ZA", "mastodon.ph": "PH", "mastodon.my": "MY",
 }
 
 
@@ -298,7 +367,11 @@ def bluesky(f, pages=5):
             params = {"q": q, "limit": 100, "lang": "en"}
             if cursor:
                 params["cursor"] = cursor
-            data = f.get("https://api.bsky.app/xrpc/app.bsky.feed.searchPosts?" + urllib.parse.urlencode(params))
+            qs = urllib.parse.urlencode(params)
+            try:
+                data = f.get("https://api.bsky.app/xrpc/app.bsky.feed.searchPosts?" + qs)
+            except urllib.error.HTTPError:
+                data = f.get("https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?" + qs)
             for p in data.get("posts", []):
                 rec = p.get("record", {})
                 yield {"id": f"bsky:{p['uri']}", "source": "bluesky", "kind": "social", "country": None,
