@@ -26,7 +26,7 @@ GROUP = rx(
 
 # Not about people of India.
 GROUP_FALSE = rx(
-    r"\b(?:american|native|red|cleveland|west|east|first nations?|plains|amazon|brazilian|mexican) indians?\b",
+    r"\b(?:american|native|red|cleveland|west|east|first nations?|plains|amazon|brazilian|mexican|foot|horse|caribbean)[\x22\u201d\x27]? indians?\b",
     r"\bindians? (?:tribes?|reservations?|nations?|casinos?)\b",
     r"\bindian (?:ocean|summer|ink|pale ale|motorcycles?|wells)\b",
 )
@@ -67,9 +67,9 @@ CONTEMPT = rx(
 
 DEHUMANISE = rx(
     r"\brats?\b", r"\bvermin\b", r"\bcockroach(?:es)?\b", r"\broaches\b", r"\bparasit(?:es|ic)\b",
-    r"\banimals\b", r"\bsub-?humans?\b", r"\bapes\b", r"\bmonkeys\b", r"\blocusts?\b", r"\bplague\b",
-    r"\binfest(?:ation|ed|ing)\b", r"\bcancer\b", r"\bsavages?\b", r"\binsects\b", r"\bleeches\b",
-    r"\bswarm(?:s|ing)?\b", r"\bdisease\b", r"\bpests?\b", r"\bfilth\b", r"\bbugs\b", r"\bsewage\b",
+    r"\banimals\b", r"\bsub-?humans?\b", r"\bapes\b", r"\bmonkeys\b", r"\blocusts?\b",
+    r"\binfest(?:ation|ed|ing)\b", r"\bsavages?\b", r"\binsects\b", r"\bleeches\b",
+    r"\bswarm(?:s|ing)?\b", r"\b(?:are|is|like|a|spread(?:ing)?) (?:a |the )?(?:cancer|disease|plague)\b", r"\bpests?\b", r"\bfilth\b", r"\bbugs\b", r"\bsewage\b",
 )
 
 EXCLUDE_VIOLENCE = rx(
@@ -151,6 +151,44 @@ STEREOTYPES = {
                r"\bbhakts?\b", r"\bbig brother\b", r"\bexpansionis", r"\bhegemon")),
 }
 
+# Loaded claims. A topic word above ("jobs", "visa", "immigration") only tags
+# the reason once a post is already hostile; it takes one of these claims to
+# make a post severity 1 on its own. Without this split, ordinary H-1B and
+# immigration-policy debate counts as stereotyping.
+CLAIMS = {
+    "smell": rx(r"\bsmell(?:s|y|ing)?\b(?! (?:good|great|amazing|delicious))", r"\bstink(?:s|y|ing)?\b", r"\breek",
+                r"\b(?:body )?odou?r\b"),
+    "dirty": rx(r"\bdirty\b", r"\bfilthy\b", r"\bunhygienic\b", r"\bdon'?t (?:wash|shower|bathe)\b",
+                r"\bsh[i1]t(?:ting)? (?:on|in) the (?:street|beach|road)", r"\bstreet ?sh[i1]tt?",
+                r"\bpoo in (?:the )?loo\b"),
+    "scam": rx(r"\bscam(?:mers?|s|ming)\b", r"\bfraudsters?\b", r"\bcon (?:men|artists)\b", r"\bliars?\b",
+               r"\bdishonest\b", r"\bcan'?t be trusted\b", r"\buntrustworthy\b", r"\bcheaters?\b"),
+    "jobs": rx(r"\b(?:steal|stealing|stole|take|taking|took|taken) (?:our|all the|all our|american|the good|white) (?:\w+ )?jobs\b",
+               r"\breplac(?:e|ing|ed) (?:us|americans|american workers|native|white|local) ",
+               r"\bundercut(?:ting)? (?:our |american |local )?wages\b", r"\bcheap (?:replacements?|scab)",
+               r"\bh-?1-?bs? (?:scam|fraud|invasion|parasites)", r"\bvisa (?:scam|fraud|mills?)\b"),
+    "nepotism": STEREOTYPES["nepotism"][2],
+    "invasion": rx(r"\binvasion\b", r"\binvad(?:e|ing|ers)\b", r"\boverr(?:un|unning)\b",
+                   r"\bflood(?:ing|ed)? (?:in|into|our|the country|the west)\b", r"\btoo many (?:of them|indians|jeets|desis)\b(?! (?:applicants|applying|in (?:the )?(?:line|queue)|waiting))",
+                   r"\btaking over\b", r"\b(?:great )?replacement\b", r"\bcoloni[sz](?:e|ing|ation)\b", r"\bswarm", r"\bhordes?\b"),
+    "creep": rx(r"\bcreeps?\b", r"\bcreepy\b", r"\bperverts?\b", r"\brapists?\b", r"\bbobs? and vag", r"\bsend bobs\b"),
+    "cheap": rx(r"\bcheapskates?\b", r"\bstingy\b", r"\btight ?fisted\b", r"\b(?:don'?t|never) tip\b",
+                r"\bcheap (?:people|bastards|asses|fucks)\b"),
+    "poor": rx(r"\bshithole\b", r"\bbackward\b", r"\buncivili[sz]ed\b", r"\bprimitive\b",
+               r"\bthird[- ]world (?:people|mentality|behaviou?r|shithole|trash)\b"),
+    "religion": rx(r"\bcow (?:piss|urine|dung)\b", r"\bgomutra\b", r"\bworship(?:ping)? (?:cows|rats|idols)\b",
+                   r"\bpiss drinkers?\b"),
+    "rude": rx(r"\b(?:so |too |very )?(?:loud|rude|pushy|entitled|obnoxious)\b", r"\bno manners\b",
+               r"\b(?:cut|skip|jump)(?:ting)? (?:the )?(?:line|queue)\b"),
+    "it": rx(r"\bcode monkeys?\b", r"\b(?:bad|terrible|shit|crap|awful|garbage) (?:code|coders|developers|engineers|programmers)\b"),
+    "drivers": rx(r"\bbad drivers?\b", r"\bcan'?t drive\b", r"\b(?:terrible|awful|worst) drivers\b"),
+    "fake_degree": STEREOTYPES["fake_degree"][2],
+    "geo": rx(r"\bsanghis?\b", r"\bbhakts?\b", r"\bexpansionis", r"\bhegemon"),
+    "incompetent": rx(r"\b(?:indians|they|desis|jeets) (?:are|r) (?:so |all |just |really )?(?:bad|terrible|awful|incompetent|lazy|"
+                      r"useless|horrible|the worst|inferior)\b", r"\bnot (?:very |inherently )?good at\b"),
+}
+STEREOTYPES["incompetent"] = ("Indians are incompetent / lazy", "workplace", CLAIMS["incompetent"])
+
 # Political/state critique: legitimate and never by itself hate.
 STATE_CRITIQUE = rx(r"\b(?:modi|bjp|congress party|indian (?:government|govt|state|army|military|policy|"
                     r"foreign ministry|embassy|high commission)|new delhi|government of india)\b")
@@ -175,6 +213,8 @@ COUNTER_SPEECH = rx(
     r"\bhate crimes? (?:against|targeting)\b", r"\bdiscriminat(?:ion|ed|ing) (?:against|toward)\b",
     r"\btargeted (?:for|because)\b", r"\bslurs? (?:against|at|toward)\b", r"\bracial abuse\b",
     r"\bcondemn", r"\bunacceptable\b", r"\bcalled (?:it|this) out\b",
+    r"\b(?:vile|disgusting|your|such|this) (?:,\s*)?racis(?:t|m)\b", r"\bracist (?:shit|crap|nonsense|garbage|bs|bullshit)\b",
+    r"\bnot going to tolerate\b", r"\bracist slurs?\b", r"\bnew slur\b", r"\bslur (?:targets|aimed|used against)\b",
 )
 # "I'm not racist but…" is the opposite of counter-speech.
 NOT_RACIST_BUT = rx(r"\b(?:i'?m|im|i am) not (?:a )?racist,? but\b", r"\bnot (?:to be|trying to be) racist,? but\b")
