@@ -100,6 +100,42 @@ class RedditFallback(unittest.TestCase):
         self.assertEqual(state["s0:comment"], 1700000500)
 
 
+class Lemmy(unittest.TestCase):
+    def test_local_users_get_instance_country(self):
+        body = {"comments": [
+            {"comment": {"ap_id": "https://lemmy.ca/comment/1", "content": "Indians are all scammers"},
+             "creator": {"actor_id": "https://lemmy.ca/u/a", "local": True}, "post": {"name": "thread"}},
+            {"comment": {"ap_id": "https://lemmy.world/comment/2", "content": "send them back"},
+             "creator": {"actor_id": "https://lemmy.world/u/b", "local": False}, "post": {"name": "Indians in Canada"}},
+        ]}
+        f = FakeFetcher({"https://lemmy.ca/api/v3/search": body, "https://": {"comments": [], "posts": []}})
+        recs = [r for r in C.lemmy(f, terms=("indians",)) if r["id"].startswith("lemmy:https://lemmy.")]
+        self.assertEqual([r["country"] for r in recs], ["CA", None])
+        self.assertEqual(recs[1]["context"], "Indians in Canada")
+
+
+class ArcticFallback(unittest.TestCase):
+    def test_arctic_when_pullpush_down(self):
+        import urllib.error
+
+        class F(FakeFetcher):
+            def get(self, url, headers=None, as_json=True):
+                if url.startswith("https://www.reddit.com/"):
+                    raise urllib.error.HTTPError(url, 403, "Blocked", {}, None)
+                if url.startswith("https://api.pullpush.io/"):
+                    raise C.HostDown("api.pullpush.io")
+                return super().get(url, headers, as_json)
+
+        body = {"data": [{"id": "c9", "body": "deport all indians", "author": "u", "created_utc": 1700000900}]}
+        f = F({"https://arctic-shift.photon-reddit.com/": body})
+        f.min_interval = 0
+        state = {}
+        recs = list(C.reddit(f, subs={f"s{i}": "GB" for i in range(5)}, state=state))
+        self.assertTrue(recs)
+        self.assertEqual(recs[0]["country"], "GB")
+        self.assertEqual(state["arctic:s0:comment"], 1700000900)
+
+
 class Aggregate(unittest.TestCase):
     def test_build(self):
         f = FakeFetcher({"https://a.4cdn.org/pol/catalog.json": CATALOG, "https://a.4cdn.org/pol/thread/1.json": THREAD})

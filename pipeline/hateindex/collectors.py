@@ -102,18 +102,45 @@ def _iso(ts):
 # ---------------------------------------------------------------- Reddit ----
 # Country subreddits; posts there are attributed to that country.
 REDDIT_SUBS = {
-    "canada": "CA", "onguardforthee": "CA", "toronto": "CA", "vancouver": "CA", "Brampton": "CA",
-    "ontario": "CA", "britishcolumbia": "CA", "alberta": "CA", "CanadaPolitics": "CA",
-    "unitedkingdom": "GB", "ukpolitics": "GB", "CasualUK": "GB", "london": "GB", "AskUK": "GB",
-    "australia": "AU", "sydney": "AU", "melbourne": "AU", "AustralianPolitics": "AU", "perth": "AU",
-    "newzealand": "NZ", "auckland": "NZ", "ireland": "IE", "AskAnAmerican": "US", "Conservative": "US",
-    "texas": "US", "nyc": "US", "bayarea": "US", "news": None, "cscareerquestions": None,
-    "singapore": "SG", "malaysia": "MY", "southafrica": "ZA", "dubai": "AE", "UAE": "AE",
-    "qatar": "QA", "saudiarabia": "SA", "pakistan": "PK", "bangladesh": "BD", "srilanka": "LK",
-    "Nepal": "NP", "Philippines": "PH", "Kenya": "KE", "Nigeria": "NG", "germany": "DE",
-    "Netherlands": "NL", "sweden": "SE", "Denmark": "DK", "Norway": "NO", "poland": "PL",
-    "japan": "JP", "China": "CN", "fiji": "FJ", "mauritius": "MU", "TrinidadandTobago": "TT",
-    "guyana": "GY", "italy": "IT", "france": "FR", "europe": None, "AskEurope": None, "portugal": "PT",
+    # North America
+    "canada": "CA", "onguardforthee": "CA", "toronto": "CA", "vancouver": "CA", "Brampton": "CA", "ontario": "CA",
+    "britishcolumbia": "CA", "alberta": "CA", "CanadaPolitics": "CA", "montreal": "CA", "Calgary": "CA", "ottawa": "CA",
+    "AskAnAmerican": "US", "Conservative": "US", "texas": "US", "nyc": "US", "bayarea": "US", "newjersey": "US",
+    "Atlanta": "US", "chicago": "US", "Seattle": "US", "dallas": "US", "mexico": "MX", "jamaica": "JM",
+    "TrinidadandTobago": "TT", "guyana": "GY", "Barbados": "BB",
+    # UK & Ireland
+    "unitedkingdom": "GB", "ukpolitics": "GB", "CasualUK": "GB", "london": "GB", "AskUK": "GB", "Scotland": "GB",
+    "manchester": "GB", "birmingham": "GB", "Leicester": "GB", "ireland": "IE", "AskIreland": "IE",
+    # Oceania
+    "australia": "AU", "sydney": "AU", "melbourne": "AU", "AustralianPolitics": "AU", "perth": "AU", "brisbane": "AU",
+    "adelaide": "AU", "newzealand": "NZ", "auckland": "NZ", "fiji": "FJ",
+    # Europe
+    "germany": "DE", "berlin": "DE", "Munich": "DE", "Netherlands": "NL", "amsterdam": "NL", "belgium": "BE",
+    "france": "FR", "paris": "FR", "Switzerland": "CH", "Austria": "AT", "sweden": "SE", "stockholm": "SE",
+    "Denmark": "DK", "Norway": "NO", "Finland": "FI", "Iceland": "IS", "poland": "PL", "czech": "CZ",
+    "hungary": "HU", "Romania": "RO", "bulgaria": "BG", "greece": "GR", "italy": "IT", "spain": "ES",
+    "portugal": "PT", "malta": "MT", "cyprus": "CY", "croatia": "HR", "serbia": "RS", "Slovenia": "SI",
+    "lithuania": "LT", "latvia": "LV", "Estonia": "EE", "ukraine": "UA", "russia": "RU", "luxembourg": "LU",
+    # Middle East & North Africa
+    "dubai": "AE", "UAE": "AE", "abudhabi": "AE", "qatar": "QA", "saudiarabia": "SA", "kuwait": "KW", "Oman": "OM",
+    "Bahrain": "BH", "israel": "IL", "Turkey": "TR", "iran": "IR", "Lebanon": "LB", "jordan": "JO", "egypt": "EG",
+    "Morocco": "MA", "algeria": "DZ", "Tunisia": "TN", "iraq": "IQ",
+    # Sub-Saharan Africa
+    "southafrica": "ZA", "Kenya": "KE", "Nigeria": "NG", "ghana": "GH", "Uganda": "UG", "tanzania": "TZ",
+    "Ethiopia": "ET", "Zimbabwe": "ZW", "zambia": "ZM", "mauritius": "MU", "Rwanda": "RW", "botswana": "BW",
+    "namibia": "NA", "Mozambique": "MZ",
+    # South Asia
+    "pakistan": "PK", "bangladesh": "BD", "srilanka": "LK", "Nepal": "NP", "maldives": "MV", "afghanistan": "AF",
+    "india": "IN", "indiasocial": "IN",
+    # East & Southeast Asia
+    "singapore": "SG", "malaysia": "MY", "indonesia": "ID", "Philippines": "PH", "Thailand": "TH", "VietNam": "VN",
+    "cambodia": "KH", "myanmar": "MM", "japan": "JP", "korea": "KR", "China": "CN", "taiwan": "TW", "HongKong": "HK",
+    # Latin America
+    "brasil": "BR", "argentina": "AR", "chile": "CL", "colombia": "CO", "PERU": "PE", "vzla": "VE", "ecuador": "EC",
+    "uruguay": "UY", "PuertoRico": "PR", "Dominican": "DO", "Panama": "PA", "CostaRica": "CR",
+    # No country
+    "news": None, "worldnews": None, "cscareerquestions": None, "europe": None, "AskEurope": None,
+    "immigration": None, "h1b": None,
 }
 
 
@@ -124,12 +151,16 @@ def reddit(f, max_threads_per_sub=8, subs=None, state=None):
     except RuntimeError as blocked:
         # reddit.com blocks unauthenticated requests from cloud IPs; PullPush
         # mirrors public Reddit posts and needs no key.
+        state = state if state is not None else {}
         got = 0
-        for rec in _reddit_pullpush(f, subs, state if state is not None else {}):
-            got += 1
-            yield rec
+        for archive in (_reddit_pullpush, _reddit_arctic):
+            for rec in archive(f, subs, state):
+                got += 1
+                yield rec
+            if got:
+                break
         if not got:
-            raise RuntimeError(f"{blocked}; PullPush fallback returned nothing") from blocked
+            raise RuntimeError(f"{blocked}; PullPush and Arctic Shift fallbacks returned nothing") from blocked
 
 
 def _reddit_direct(f, max_threads_per_sub, subs):
@@ -166,6 +197,30 @@ def _reddit_direct(f, max_threads_per_sub, subs):
                     stack.extend(rep["data"]["children"])
 
 
+def _reddit_arctic(f, subs, state):
+    """Arctic Shift (arctic-shift.photon-reddit.com), a second public Reddit archive."""
+    f.min_interval = max(f.min_interval, 1.5)
+    for sub, cc in subs.items():
+        for kind, path, field in (("comment", "comments", "body"), ("submission", "posts", "query")):
+            key = f"arctic:{sub}:{kind}"
+            params = {"subreddit": sub, field: "indian", "limit": 100, "sort": "desc"}
+            if state.get(key):
+                params["after"] = state[key]
+            try:
+                data = f.get(f"https://arctic-shift.photon-reddit.com/api/{path}/search?" + urllib.parse.urlencode(params))
+            except HostDown:
+                return
+            except Exception:
+                continue
+            items = data.get("data") or [] if isinstance(data, dict) else []
+            for d in items:
+                text = d.get("body", "") if kind == "comment" else d.get("title", "") + "\n" + d.get("selftext", "")
+                d.setdefault("name", ("t1_" if kind == "comment" else "t3_") + str(d.get("id")))
+                yield _reddit_rec(d, sub, cc, text, "", d.get("permalink"))
+            if items:
+                state[key] = max(int(d.get("created_utc", 0)) for d in items)
+
+
 def _reddit_pullpush(f, subs, state):
     """PullPush search, newest first, picking up after the newest item already stored."""
     f.min_interval = max(f.min_interval, 2.0)
@@ -178,7 +233,7 @@ def _reddit_pullpush(f, subs, state):
             try:
                 data = f.get("https://api.pullpush.io/reddit/search/" + kind + "/?" + urllib.parse.urlencode(params))
             except HostDown:
-                raise
+                return
             except Exception:
                 continue
             items = data.get("data", []) if isinstance(data, dict) else []
@@ -358,6 +413,49 @@ def mastodon(f, tags=("india", "indians", "indian", "h1b", "immigration")):
                        "text": s.get("content", ""), "context": "", "url": s.get("url"), "created": s.get("created_at")}
 
 
+# ---------------------------------------------------------------- Lemmy -----
+# Reddit-like fediverse forums. Like Mastodon, only an instance's own users
+# are attributed to its country.
+LEMMY_INSTANCES = {
+    "lemmy.ca": "CA", "feddit.uk": "GB", "aussie.zone": "AU", "lemmy.nz": "NZ", "feddit.nl": "NL",
+    "feddit.org": "DE", "discuss.tchncs.de": "DE", "sopuli.xyz": "FI", "feddit.dk": "DK", "feddit.it": "IT",
+    "lemmy.pt": "PT", "szmer.info": "PL", "lemmy.eco.br": "BR", "midwest.social": "US", "lemmy.world": None,
+    "lemmy.ml": None, "sh.itjust.works": None, "programming.dev": None, "lemmy.zip": None, "lemmy.today": None,
+    "slrpnk.net": None, "lemmy.dbzer0.com": None,
+}
+
+
+def lemmy(f, terms=("indians", "indian immigrants", "pajeet", "h1b")):
+    for inst, cc in LEMMY_INSTANCES.items():
+        for term in terms:
+            for kind in ("Comments", "Posts"):
+                params = urllib.parse.urlencode({"q": term, "type_": kind, "sort": "New", "limit": 50,
+                                                 "listing_type": "All"})
+                try:
+                    data = f.get(f"https://{inst}/api/v3/search?{params}")
+                except HostDown:
+                    break
+                except Exception:
+                    continue
+                for item in data.get("comments" if kind == "Comments" else "posts", []):
+                    creator = item.get("creator", {})
+                    if kind == "Comments":
+                        obj, text = item.get("comment", {}), item.get("comment", {}).get("content", "")
+                        ctx = item.get("post", {}).get("name", "")
+                    else:
+                        obj = item.get("post", {})
+                        text, ctx = obj.get("name", "") + "\n" + (obj.get("body") or ""), ""
+                    if not obj.get("ap_id"):
+                        continue
+                    yield {"id": f"lemmy:{obj['ap_id']}", "source": "lemmy", "kind": "social",
+                           "country": cc if creator.get("local") else None,
+                           "author": author_hash("lemmy", creator.get("actor_id", "")), "text": text, "context": ctx,
+                           "url": obj.get("ap_id"), "created": obj.get("published")}
+            else:
+                continue
+            break
+
+
 # -------------------------------------------------------------- Bluesky -----
 def bluesky(f, pages=5):
     # Public AppView search. May require auth in future; failures are recorded.
@@ -420,6 +518,6 @@ def x_twitter(f):
 
 COLLECTORS = {
     "reddit": reddit, "4chan": fourchan, "gdelt": gdelt, "google_news": google_news, "hackernews": hackernews,
-    "mastodon": mastodon, "bluesky": bluesky, "medium": medium, "wordpress": wordpress,
+    "mastodon": mastodon, "lemmy": lemmy, "bluesky": bluesky, "medium": medium, "wordpress": wordpress,
     "youtube": youtube, "x": x_twitter,
 }
