@@ -128,6 +128,7 @@ def build(records, window_label="", source_status=None):
     by_region = defaultdict(list)                   # region -> [(author, r)] (all layers)
     dated = defaultdict(list)                       # layer -> [(date, r)]
 
+    first_collected = min((r["collected"] for r in records if r.get("collected")), default=None)
     for rec in records:
         totals["posts"] += 1
         src_counts[rec["source"]] += 1
@@ -200,6 +201,7 @@ def build(records, window_label="", source_status=None):
     regions.sort(key=lambda x: -x["authors"])
 
     overview = {
+        "collection_started": first_collected,
         "countries_with_data": sum(1 for c in countries.values() if c["layers"]["all"]["authors"]),
         "countries_scored": {layer: sum(1 for c in countries.values() if c["layers"][layer].get("rank"))
                              for layer in ["all", *LAYERS]},

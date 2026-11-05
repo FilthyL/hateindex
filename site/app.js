@@ -23,7 +23,7 @@
       : matchMedia("(prefers-color-scheme: dark)").matches;
     document.documentElement.dataset.theme = dark ? "light" : "dark";
     try { localStorage.setItem("theme", document.documentElement.dataset.theme); } catch (e) {}
-    paint();
+    if (data) render(); else paint();
   };
 
   const bin = (v) => { let i = 0; while (i < BINS.length && v >= BINS[i]) i++; return i; };
@@ -172,7 +172,115 @@
     }
   }
 
-  function render() { paint(); rankTable(); globalPanel(); status(); }
+  // ---------- world overview ----------
+  const num = (x) => (x ?? 0).toLocaleString();
+
+  function kpis() {
+    const o = data.overview || {}, t = data.totals || {}, g = (data.global || {})[layer] || {};
+    const scored = (o.countries_scored || {})[layer] || 0;
+    document.getElementById("kpis").innerHTML = [
+      [num(t.targeted), "posts about Indians (all sources)"],
+      [num(g.authors), "people analysed"],
+      [`${o.countries_with_data || 0}`, "countries with any data"],
+      [`${scored}`, "countries with enough to score"],
+      [g.authors ? pct(g.hateful_author_share) : "—", "of people posted something hostile"],
+    ].map(([v, l]) => `<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join("");
+  }
+
+  function regionsPanel() {
+    const rs = (data.overview || {}).regions || [];
+    const el = document.getElementById("regions");
+    if (!rs.length) { el.innerHTML = `<p class="empty">No regional data yet.</p>`; return; }
+    // scale to the next multiple of 10 above the highest region (min 20), and say so
+    const max = Math.max(20, Math.ceil(Math.max(...rs.map((r) => r.index || 0)) / 10) * 10);
+    document.getElementById("regions-scale").textContent = `Bar scale 0–${max}.`;
+    el.innerHTML = rs.map((r) => {
+      const ok = r.confidence !== "insufficient";
+      return `<div class="hbar"><span>${esc(r.region)}</span>
+        <div class="track"><div class="fill" style="width:${ok ? Math.max(1.5, 100 * r.index / max) : 0}%"></div></div>
+        <span class="v">${ok ? r.index.toFixed(1) : "—"}</span>
+        <span class="meta">${num(r.authors)} people · ${r.countries} countr${r.countries === 1 ? "y" : "ies"} · ${ok ? esc(r.confidence) + " confidence" : "not enough data"}${r.reasons[0] ? " · mostly " + esc(r.reasons[0].label.toLowerCase()) : ""}</span></div>`;
+    }).join("");
+  }
+
+  function timelineChart() {
+    const o = data.overview || {};
+    const rows = ((o.timeline || {})[layer] || []).map((d) => ({ ...d, other: d.posts - d.hostile }));
+    const el = document.getElementById("timeline");
+    document.getElementById("tl-legend").innerHTML =
+      `<span><span class="sw-h"></span>Hostile</span><span><span class="sw-o"></span>Other posts</span>`;
+    if (!rows.length || !rows.some((d) => d.posts)) { el.innerHTML = `<p class="empty">No dated posts yet.</p>`; return; }
+    const W = 520, H = 200, m = { t: 12, r: 8, b: 22, l: 34 };
+    const x = d3.scaleBand().domain(rows.map((d) => d.week)).range([m.l, W - m.r]).paddingInner(0.15);
+    const y = d3.scaleLinear().domain([0, d3.max(rows, (d) => d.posts) || 1]).nice().range([H - m.b, m.t]);
+    el.innerHTML = "";
+    const svg = d3.select(el).append("svg").attr("viewBox", `0 0 ${W} ${H}`).attr("role", "img")
+      .attr("aria-label", "Weekly posts about Indians, split into hostile and other");
+    svg.append("g").attr("class", "axis").attr("transform", `translate(${m.l},0)`)
+      .call(d3.axisLeft(y).ticks(4).tickSize(-(W - m.l - m.r)).tickFormat(d3.format("~s")))
+      .call((g) => g.select(".domain").remove()).call((g) => g.selectAll("line").attr("stroke-opacity", 0.5));
+    const months = rows.filter((d, i) => i === 0 || d.week.slice(5, 7) !== rows[i - 1].week.slice(5, 7));
+    svg.append("g").attr("class", "axis").attr("transform", `translate(0,${H - m.b})`)
+      .call(d3.axisBottom(x).tickValues(months.map((d) => d.week)).tickSize(0).tickPadding(6)
+        .tickFormat((w) => new Date(w + "T00:00:00Z").toLocaleString("en", { month: "short", timeZone: "UTC" })))
+      .call((g) => g.select(".domain").remove());
+    const bars = svg.append("g");
+    rows.forEach((d) => {
+      const bx = x(d.week), bw = x.bandwidth();
+      if (d.other) bars.append("rect").attr("x", bx).attr("width", bw).attr("y", y(d.other)).attr("height", y(0) - y(d.other))
+        .attr("fill", css("--neutral")).attr("rx", d.hostile ? 0 : 2);
+      if (d.hostile) bars.append("rect").attr("x", bx).attr("width", bw).attr("y", y(d.posts)).attr("height", Math.max(0, y(d.other) - y(d.posts) - (d.other ? 1 : 0)))
+        .attr("fill", css("--r5")).attr("rx", 2);
+      bars.append("rect").attr("x", bx).attr("width", bw).attr("y", m.t).attr("height", H - m.b - m.t).attr("fill", "transparent")
+        .on("mousemove", (ev) => {
+          tip.innerHTML = `<h4>Week of ${esc(d.week)}</h4><p>${num(d.posts)} posts about Indians · ${num(d.hostile)} hostile${d.posts ? ` (${pct(d.hostile / d.posts)})` : ""}</p>`;
+          tip.hidden = false; tip.style.left = Math.min(ev.clientX + 14, innerWidth - 350) + "px"; tip.style.top = ev.clientY + 14 + "px";
+        }).on("mouseleave", hide);
+    });
+    let note = "";
+    if (o.collection_started) {
+      const start = o.collection_started.slice(0, 10);
+      const wk = rows.find((d) => d.week <= start && start < (rows[rows.indexOf(d) + 1] || { week: "9999" }).week);
+      if (wk) {
+        const cx = x(wk.week) + x.bandwidth() / 2;
+        svg.append("line").attr("class", "mark-line").attr("x1", cx).attr("x2", cx).attr("y1", m.t).attr("y2", H - m.b);
+        svg.append("text").attr("class", "mark-text").attr("x", cx - 4).attr("y", m.t + 8).attr("text-anchor", "end").text("collection started");
+      }
+      note = `Collection started ${start}. Earlier weeks only include older posts from sources that can be searched back in time (Hacker News, news, blogs), so they undercount — the jump at the start is the collector switching on, not a surge in hostility.`;
+    }
+    document.getElementById("tl-note").textContent = note;
+  }
+
+  function bySource() {
+    const rows = (data.overview || {}).by_source || [];
+    const el = document.getElementById("by-source");
+    if (!rows.length) { el.innerHTML = `<p class="empty">—</p>`; return; }
+    const max = Math.max(...rows.map((r) => r.about_indians));
+    el.innerHTML = `<div class="legend small" style="margin:0 0 6px"><span><span class="sw-h"></span>Hostile</span><span><span class="sw-o"></span>Other posts</span></div>` +
+      rows.map((r) => `<div class="hbar"><span>${esc(r.source)}</span>
+        <div class="stack" style="width:${Math.max(2, 100 * r.about_indians / max)}%">
+          ${r.hostile ? `<div class="h" style="flex:${r.hostile}"></div>` : ""}${r.about_indians - r.hostile ? `<div class="o" style="flex:${r.about_indians - r.hostile}"></div>` : ""}</div>
+        <span class="v">${num(r.about_indians)}</span>
+        <span class="meta">${num(r.hostile)} hostile (${pct(r.hostile / (r.about_indians || 1))})</span></div>`).join("");
+  }
+
+  function coverageTable() {
+    const rows = Object.values(data.countries || {}).filter((c) => stat(c) && stat(c).authors)
+      .sort((a, b) => stat(b).authors - stat(a).authors);
+    const tb = document.querySelector("#coverage tbody");
+    tb.innerHTML = rows.length ? rows.map((c) => {
+      const s = stat(c), scored = s.confidence !== "insufficient";
+      const st = c.domestic ? "domestic" : scored ? `${s.confidence} confidence` : `needs ${10 - s.authors} more`;
+      return `<tr data-num="${c.num}"><td>${esc(c.name)}</td><td>${esc(c.region || "")}</td><td class="num">${num(s.authors)}</td>
+        <td class="num">${scored ? s.index.toFixed(1) : "—"}</td><td><span class="status-pill">${esc(st)}</span></td></tr>`;
+    }).join("") : `<tr><td colspan="5" class="empty">No country data for this measure yet.</td></tr>`;
+    tb.querySelectorAll("tr[data-num]").forEach((tr) => tr.addEventListener("click", (ev) => {
+      const f = paths && paths.data().find((d) => String(d.id).padStart(3, "0") === tr.dataset.num);
+      if (f) { ev.stopPropagation(); show(ev, f, true); }
+    }));
+  }
+
+  function render() { paint(); kpis(); regionsPanel(); timelineChart(); bySource(); coverageTable(); rankTable(); globalPanel(); status(); }
 
   document.querySelectorAll(".seg").forEach((b) => b.addEventListener("click", () => {
     document.querySelectorAll(".seg").forEach((x) => x.classList.toggle("active", x === b));
