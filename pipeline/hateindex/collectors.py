@@ -243,10 +243,11 @@ def _archive_url(name, kind, sub, term, after):
         if after:
             params["after"] = after
         return f"https://api.pullpush.io/reddit/search/{kind}/?" + urllib.parse.urlencode(params)
-    path, field = ("comments", "body") if kind == "comment" else ("posts", "query")
-    params = {"subreddit": sub, field: term, "limit": 100, "sort": "desc"}
-    if after:
-        params["after"] = after
+    # Arctic Shift rejects (422) open-ended full-text searches on big subreddits,
+    # so always give it a time window; posts are searched by title.
+    path, field = ("comments", "body") if kind == "comment" else ("posts", "title")
+    params = {"subreddit": sub, field: term, "limit": 100, "sort": "desc",
+              "after": after or int(time.time() - 30 * 86400)}
     return f"https://arctic-shift.photon-reddit.com/api/{path}/search?" + urllib.parse.urlencode(params)
 
 

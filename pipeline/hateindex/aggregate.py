@@ -206,8 +206,10 @@ def build(records, window_label="", source_status=None):
     languages = []
     for code, items in by_lang.items():
         st = _layer_stats(items, g["all"]["raw"])
+        # Raw, not shrunk: pulling a language toward the (English-dominated) global mean
+        # would show hostility in languages where none was found.
         languages.append({"lang": code, "name": M.LANG_NAMES.get(code, code), "authors": st["authors"],
-                          "posts": st["posts"], "hateful_posts": st["hateful_posts"], "index": st["index"],
+                          "posts": st["posts"], "hateful_posts": st["hateful_posts"], "index": st["raw"],
                           "hateful_author_share": st["hateful_author_share"], "confidence": st["confidence"],
                           "reasons": st["reasons"][:3], "stereotypes": st["stereotypes"][:3]})
     languages.sort(key=lambda x: -x["posts"])
