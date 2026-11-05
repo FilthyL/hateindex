@@ -19,7 +19,8 @@ public sources ──► collectors ──► data/raw/*.jsonl.gz (data branch) 
    | Source | Type | Country from |
    |---|---|---|
    | 4chan /pol/, /int/, /bant/, /sp/ (official API; every changed live thread, hourly) | social | IP-based post flag |
-   | Reddit (~60 country subreddits; public JSON, or [PullPush](https://pullpush.io) when reddit.com blocks) | social | subreddit |
+   | Reddit (156 subreddits, 105 countries; public JSON, else [PullPush](https://pullpush.io) or [Arctic Shift](https://arctic-shift.photon-reddit.com)) | social | subreddit |
+   | Lemmy (public search on 22 instances) | social | instance (local accounts only) |
    | Mastodon (public tag timelines) | social | instance (local accounts only) |
    | Hacker News (Algolia API) | social | — (global only) |
    | Bluesky (public AppView search) | social | — (global only) |

@@ -4,7 +4,7 @@
   const RAMP = ["--r1", "--r2", "--r3", "--r4", "--r5", "--r6"];
   const LOCATION = {
     "4chan": "Post's country flag", reddit: "Country subreddit", gdelt: "Outlet's country",
-    google_news: "Country edition", mastodon: "Instance country", hackernews: "None (global only)",
+    google_news: "Country edition", mastodon: "Instance country", lemmy: "Instance country", hackernews: "None (global only)",
     bluesky: "None (global only)", medium: "None (global only)", wordpress: "None (global only)",
     youtube: "Needs API key", x: "Needs API key",
   };
