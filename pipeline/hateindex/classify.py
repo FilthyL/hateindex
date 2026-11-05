@@ -25,6 +25,8 @@ def clean(text: str) -> str:
     text = _QUOTE_LINK.sub(" ", text)
     text = unicodedata.normalize("NFKC", text)
     text = text.replace("’", "'").replace("‘", "'")
+    for pattern, repl in T.OBFUSCATIONS:
+        text = pattern.sub(repl, text)
     return re.sub(r"[ \t]+", " ", text).strip()
 
 
@@ -108,9 +110,12 @@ def classify(text: str, context: str = "") -> Result:
     scoped, prev = [], False
     for s in sentences:
         hit = _targets(s, context_targeted)
-        if hit or (prev and T.PRONOUN_TARGET.search(s)):
+        # a pronoun, or a short elliptical answer ("pollute."), continues the previous mention
+        if hit or (prev and (T.PRONOUN_TARGET.search(s) or len(s.split()) < 8)):
             scoped.append(s)
         prev = hit
+    if not scoped and context_targeted and T.MEMES.search(low):
+        scoped = [low]
     if not scoped:
         if T.STATE_CRITIQUE.search(low):
             r.state_only = True
@@ -151,6 +156,8 @@ def classify(text: str, context: str = "") -> Result:
     if (can_attribute and _near(T.CONTEMPT, scope, anchors)) or _near(T.COMPARATIVE, scope, anchors):
         sev = max(sev, 2)
     if can_attribute and _near(T.DEHUMANISE, scope, anchors):
+        sev = max(sev, 3)
+    if context_targeted and T.MEMES.search(low):
         sev = max(sev, 3)
     if _near(T.EXCLUDE_VIOLENCE, scope, anchors, 80):
         sev = 4

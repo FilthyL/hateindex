@@ -35,7 +35,10 @@ GROUP_FALSE = rx(
 SLURS = rx(
     r"\bpajeets?\b", r"\bpoo+(?:\s|-)?in(?:\s|-)?(?:the\s)?loo+s?\b", r"\bstreet ?sh[i1]tt?ers?\b",
     r"\bcurry ?(?:munchers?|monkeys?|niggers?|n[i1]gg?as?|eaters?)\b", r"\bdot ?heads?\b",
-    r"\bsaa+r\b(?=.*\b(?:needful|kindly|bobs|vagene|redeem|indian|pajeet)\b)",
+    r"\bsaa+r\b(?=.*\b(?:needful|kindly|bobs|vagene|redeem|indian|pajeet|izzat|tikka|jeet)\b)",
+    r"\bsaa+r+\b.*\bsaa+r+\b", r"\bsaar{2,}\b", r"\bsaa{2,}r+\b",  # repeated or stretched "saar" = mock accent
+    r"\b(?:this|that|a|the|some|another|swiss|american|british|canadian|aussie|german|dutch) poos?\b",
+    r"\bizzat\b(?=.*\b(?:jeets?|saa+r|pajeets?|lose|lost)\b)",
     r"\bbobs? and vag(?:ene|ana|ina)\b", r"\bredeem\b.*\bsaa+r\b", r"\bsaa+rs\b",
     r"\bjeets?\b", r"\bcurry ?(?:land|stan)\b", r"\bpoojeets?\b",
 )
@@ -85,6 +88,7 @@ EXCLUDE_VIOLENCE = rx(
     r"\bstop (?:all )?indian (?:immigration|migration|visas)\b", r"\bclose the (?:borders?|gates?) to indians\b",
     r"\bexecut(?:e|ing) (?:all |the )?(?:indians|them|jeets|pajeets)\b", r"\bgenocid(?:e|ing)\b",
     r"\bhunt(?:ing)? (?:down )?(?:indians|them|jeets|pajeets)\b", r"\blynch", r"\bshoot (?:them|indians|jeets)\b",
+    r"\b(?:disallow|ban|bar|block|exclude|stop) (?:all )?indian(?:s| nationals| citizens| people| workers)? from\b",
 )
 
 # --- Reasons ("why") and stereotypes ("what") --------------------------------
@@ -108,7 +112,7 @@ STEREOTYPES = {
     "smell": ("Indians smell / smell of curry", "hygiene",
               rx(r"\bsmell(?:s|y|ing)?\b", r"\bstink(?:s|y|ing)?\b", r"\bodou?r\b", r"\bb\.?o\.?\b", r"\breek")),
     "dirty": ("Indians are dirty / defecate in the street", "hygiene",
-              rx(r"\bdirty\b", r"\bpoop(?:ing)?\b", r"\bsh[i1]t(?:ting)? (?:on|in) the (?:street|beach|road)",
+              rx(r"\bdirty\b", r"\bpoop(?:ing)?\b", r"\bpollut(?:e|ing|ers?)\b", r"\bsh[i1]t(?:ting)? (?:on|in) the (?:street|beach|road)",
                  r"\bopen defecation\b", r"\bunhygienic\b", r"\bhygiene\b", r"\bdon'?t (?:wash|shower|bathe)\b",
                  r"\bpoo in loo\b", r"\bstreet ?sh[i1]tt?ers?\b", r"\bsewage\b", r"\bganges\b", r"\bfilth")),
     "scam": ("Indians are scammers", "fraud",
@@ -160,7 +164,7 @@ STEREOTYPES = {
 CLAIMS = {
     "smell": rx(r"\bsmell(?:s|y|ing)?\b(?! (?:good|great|amazing|delicious))", r"\bstink(?:s|y|ing)?\b", r"\breek",
                 r"\b(?:body )?odou?r\b"),
-    "dirty": rx(r"\bdirty\b", r"\bfilthy\b", r"\bunhygienic\b", r"\bdon'?t (?:wash|shower|bathe)\b",
+    "dirty": rx(r"\bdirty\b", r"\bfilthy\b", r"\bunhygienic\b", r"\bpollut(?:e|ing|ers?)\b", r"\bdon'?t (?:wash|shower|bathe)\b",
                 r"\bsh[i1]t(?:ting)? (?:on|in) the (?:street|beach|road)", r"\bstreet ?sh[i1]tt?",
                 r"\bpoo in (?:the )?loo\b"),
     "scam": rx(r"\bscam(?:mers?|s|ming)\b", r"\bfraudsters?\b", r"\bcon (?:men|artists)\b", r"\bliars?\b",
@@ -198,6 +202,7 @@ COMPARATIVE = rx(
     r"\bat least (?:they|we|i)?\s*use (?:a )?toilets?\b", r"\b(?:i )?(?:like|prefer) \w+ more th[ae]n (?:the )?(?:indians|jeets)\b",
     r"\bruin(?:s|ed|ing)? (?:everything|every (?:place|country|city|thing)|this country|the (?:country|neighbou?rhood|city))\b",
     r"\boutbreed", r"\bflood(?:ed|ing|s)? [\w ]{1,20} with (?:indians|jeets|pajeets|them)\b",
+    r"\bmak(?:e|es|ing) (?:\w+ )?(?:a )?worse place\b",
 )
 
 # Someone describing or rejecting a view, not holding it.
@@ -208,6 +213,14 @@ REPORTED = rx(
     r"\bblaming (?:indians|immigrants|them) for\b", r"\bget(?:ting)? attacked for\b", r"\bi am tired of it\b",
     r"\b(?:arrested|charged|convicted|sentenced|jailed|detained|indicted)\b",
 )
+# Known hate memes that never name the group; counted only in a thread or reply about Indians
+MEMES = rx(r"\bif it'?s brown,? flush it down\b", r"\bpoo in (?:the )?loo\b", r"\bdesignated shitting street",
+           r"\bdo the needful\b(?=.*\b(?:saa+r|redeem|jeet|bobs)\b)")
+
+# Deliberate misspellings used to dodge filters
+OBFUSCATIONS = [(re.compile(r"\b[l1|!]ndians?\b", re.I), "indians"), (re.compile(r"\bind[1l!]ans\b", re.I), "indians"),
+                (re.compile(r"\bj[3e]{2}ts?\b", re.I), "jeets"), (re.compile(r"\bpaj[3e]{2}ts?\b", re.I), "pajeets")]
+
 # Insults addressed to the person being replied to, not to Indians
 VOCATIVE = re.compile(r",\s*(?:you\s+)?(?:fucking\s+)?(?:retard(?:ed)?|idiot|moron|dumbass|faggot|nigger|cunt)s?\b", re.I)
 

@@ -168,7 +168,7 @@
     if (!data.totals || !data.totals.posts) {
       el.innerHTML = "<strong>No data yet.</strong> The first collection run hasn’t finished. The map fills in after the scheduled GitHub Actions job runs.";
     } else {
-      el.innerHTML = `Updated <strong>${esc(data.generated_at.slice(0, 16).replace("T", " "))} UTC</strong> · ${esc(data.window)} · ${n} ${n === 1 ? "country" : "countries"} with enough data for this measure.`;
+      el.innerHTML = `Updated <strong>${esc(data.generated_at.slice(0, 16).replace("T", " "))} UTC</strong> · ${esc(data.window)} · ${n} ${n === 1 ? "country" : "countries"} with enough data for this measure. Counts <a href="#accuracy">explicit</a> hostility only, so it's a floor.`;
     }
   }
 
