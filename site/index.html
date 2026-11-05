@@ -11,7 +11,7 @@
 <header class="wrap top">
   <div>
     <h1>Indian Hate Index</h1>
-    <p class="lede">Where online hostility toward Indians comes from, what drives it, and which stereotypes keep coming up. Built from public posts, news headlines and blogs, with sarcasm and counter-speech filtered out.</p>
+    <p class="lede">Where <em>explicit</em> online hostility toward Indians comes from, what drives it, and which stereotypes keep coming up. Built from public posts, news headlines and blogs, with sarcasm and counter-speech filtered out. <a href="#accuracy">How accurate is it?</a></p>
   </div>
   <button id="theme" class="ghost" aria-label="Toggle dark mode">Dark / light</button>
 </header>
@@ -51,6 +51,9 @@
     </div>
     <div class="grid2 inner">
       <div>
+        <h3>By language</h3>
+        <p class="muted small">Every source, including ones without a location (YouTube, Hacker News, Bluesky, blogs). Non-English rules are simpler than the English ones, so read these as rougher signals.</p>
+        <div id="by-language"></div>
         <h3>By source</h3>
         <div id="by-source"></div>
       </div>
@@ -72,6 +75,22 @@
       <h2>Worldwide picture</h2>
       <div id="global"></div>
     </div>
+  </section>
+
+  <section class="card prose" id="accuracy">
+    <h2>How accurate is this?</h2>
+    <p>We hand-labelled 310 real collected posts, blind, and checked the classifier against them. On the 80 it was never tuned on:</p>
+    <div class="kpis">
+      <div class="kpi"><b>83%</b><span>of posts it flags really are hostile (precision)</span></div>
+      <div class="kpi"><b>25%</b><span>of hostile posts it actually catches (recall)</span></div>
+      <div class="kpi"><b>70%</b><span>right about whether a post is about people from India at all</span></div>
+    </div>
+    <ul>
+      <li><strong>Explicit hostility is measured fairly reliably</strong>: slurs, "deport them", "they're rats", "Indians are scammers".</li>
+      <li><strong>Most hostility is missed.</strong> It's implicit: mock-accent jokes, tropes, insults aimed at an Indian poster that never say "Indian". Word lists can't see these.</li>
+      <li><strong>So every number here is a floor, and an uneven one.</strong> How much gets missed depends on the platform, and each country's data comes from a different mix of platforms. Read country differences as signals worth looking into, not measured gaps.</li>
+      <li>"Hate" takes judgement. The labels are one careful reader's calls, not ground truth. Details and the labelled data: <a href="https://github.com/FilthyL/hateindex/blob/main/docs/ACCURACY.md">docs/ACCURACY.md</a>.</li>
+    </ul>
   </section>
 
   <section class="card prose" id="definition">

@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 from .classify import classify, SEVERITY_NAMES
 from . import taxonomy as T
+from . import multilingual as M
 
 SHRINK_K = 30
 MIN_AUTHORS = 10
@@ -126,6 +127,7 @@ def build(records, window_label="", source_status=None):
     src_counts = Counter()
     src_targeted, src_hostile = Counter(), Counter()
     by_region = defaultdict(list)                   # region -> [(author, r)] (all layers)
+    by_lang = defaultdict(list)                     # language -> [(author, r)]
     dated = defaultdict(list)                       # layer -> [(date, r)]
 
     first_collected = min((r["collected"] for r in records if r.get("collected")), default=None)
@@ -155,6 +157,7 @@ def build(records, window_label="", source_status=None):
         when = parse_date(rec.get("created")) or parse_date(rec.get("collected"))
         glob["all"].append((key, r))
         dated["all"].append((when, r))
+        by_lang[r.lang or "en"].append((key, r))
         if cc and cc not in DOMESTIC:
             by_region[country_meta(cc)["region"]].append((key, r))
         for layer, kinds in LAYERS.items():
@@ -200,12 +203,22 @@ def build(records, window_label="", source_status=None):
                         "confidence": st["confidence"], "reasons": st["reasons"][:3], "stereotypes": st["stereotypes"][:3]})
     regions.sort(key=lambda x: -x["authors"])
 
+    languages = []
+    for code, items in by_lang.items():
+        st = _layer_stats(items, g["all"]["raw"])
+        languages.append({"lang": code, "name": M.LANG_NAMES.get(code, code), "authors": st["authors"],
+                          "posts": st["posts"], "hateful_posts": st["hateful_posts"], "index": st["index"],
+                          "hateful_author_share": st["hateful_author_share"], "confidence": st["confidence"],
+                          "reasons": st["reasons"][:3], "stereotypes": st["stereotypes"][:3]})
+    languages.sort(key=lambda x: -x["posts"])
+
     overview = {
         "collection_started": first_collected,
         "countries_with_data": sum(1 for c in countries.values() if c["layers"]["all"]["authors"]),
         "countries_scored": {layer: sum(1 for c in countries.values() if c["layers"][layer].get("rank"))
                              for layer in ["all", *LAYERS]},
         "regions": regions,
+        "languages": languages,
         "timeline": {layer: timeline(dated[layer]) for layer in ["all", *LAYERS]},
         "by_source": sorted(({"source": k, "about_indians": v, "hostile": src_hostile[k]}
                              for k, v in src_targeted.items()), key=lambda x: -x["about_indians"]),

@@ -6,7 +6,7 @@
     "4chan": "Post's country flag", reddit: "Country subreddit", gdelt: "Outlet's country",
     google_news: "Country edition", mastodon: "Instance country", lemmy: "Instance country", hackernews: "None (global only)",
     bluesky: "None (global only)", medium: "None (global only)", wordpress: "None (global only)",
-    youtube: "Needs API key", x: "Needs API key",
+    youtube: "None (worldwide & language only)", x: "Needs API key",
   };
   let data = null, layer = "people", byNum = new Map(), paths = null;
   const tip = document.getElementById("tip");
@@ -168,7 +168,7 @@
     if (!data.totals || !data.totals.posts) {
       el.innerHTML = "<strong>No data yet.</strong> The first collection run hasn’t finished. The map fills in after the scheduled GitHub Actions job runs.";
     } else {
-      el.innerHTML = `Updated <strong>${esc(data.generated_at.slice(0, 16).replace("T", " "))} UTC</strong> · ${esc(data.window)} · ${n} ${n === 1 ? "country" : "countries"} with enough data for this measure.`;
+      el.innerHTML = `Updated <strong>${esc(data.generated_at.slice(0, 16).replace("T", " "))} UTC</strong> · ${esc(data.window)} · ${n} ${n === 1 ? "country" : "countries"} with enough data for this measure. Counts <a href="#accuracy">explicit</a> hostility only, so it's a floor.`;
     }
   }
 
@@ -251,6 +251,20 @@
     document.getElementById("tl-note").textContent = note;
   }
 
+  function byLanguage() {
+    const rows = (data.overview || {}).languages || [];
+    const el = document.getElementById("by-language");
+    if (!rows.length) { el.innerHTML = `<p class="empty">—</p>`; return; }
+    const max = Math.max(20, Math.ceil(Math.max(...rows.map((r) => r.confidence !== "insufficient" ? r.index : 0)) / 10) * 10);
+    el.innerHTML = `<p class="muted small" style="margin:0 0 4px">Bar = hate index, scale 0–${max}.</p>` + rows.map((r) => {
+      const ok = r.confidence !== "insufficient";
+      return `<div class="hbar"><span>${esc(r.name)}</span>
+        <div class="track"><div class="fill" style="width:${ok ? Math.max(1.5, 100 * r.index / max) : 0}%"></div></div>
+        <span class="v">${ok ? r.index.toFixed(1) : "—"}</span>
+        <span class="meta">${num(r.posts)} posts · ${num(r.authors)} people · ${num(r.hateful_posts)} hostile${ok ? "" : " · not enough people yet"}${r.stereotypes[0] ? " · top stereotype: " + esc(r.stereotypes[0].label) : ""}</span></div>`;
+    }).join("");
+  }
+
   function bySource() {
     const rows = (data.overview || {}).by_source || [];
     const el = document.getElementById("by-source");
@@ -280,7 +294,7 @@
     }));
   }
 
-  function render() { paint(); kpis(); regionsPanel(); timelineChart(); bySource(); coverageTable(); rankTable(); globalPanel(); status(); }
+  function render() { paint(); kpis(); regionsPanel(); timelineChart(); byLanguage(); bySource(); coverageTable(); rankTable(); globalPanel(); status(); }
 
   document.querySelectorAll(".seg").forEach((b) => b.addEventListener("click", () => {
     document.querySelectorAll(".seg").forEach((x) => x.classList.toggle("active", x === b));
