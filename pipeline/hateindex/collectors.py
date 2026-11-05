@@ -197,13 +197,23 @@ def _reddit_direct(f, max_threads_per_sub, subs):
                     stack.extend(rep["data"]["children"])
 
 
+# English plus local-language terms, for subreddits that don't post in English
+REDDIT_QUERY = ("indians|indian|desi|pajeet|jeet|hindúes|indianos|indiens|inder|indiani|indiërs|hindusi|hintliler|"
+                "индийцы|индусы|الهنود|インド人|印度人")
+LOCAL_TERM = {"MX": "hindúes", "ES": "hindúes", "AR": "hindúes", "CL": "hindúes", "CO": "hindúes", "PE": "hindúes",
+              "VE": "hindúes", "EC": "hindúes", "UY": "hindúes", "BR": "indianos", "PT": "indianos", "FR": "indiens",
+              "BE": "indiens", "DE": "inder", "AT": "inder", "CH": "inder", "IT": "indiani", "NL": "indiërs",
+              "PL": "hindusi", "RU": "индийцы", "TR": "hintliler", "JP": "インド人", "TW": "印度人",
+              "HK": "印度人", "CN": "印度人", "ID": "orang india", "SA": "الهنود", "EG": "الهنود"}
+
+
 def _reddit_arctic(f, subs, state):
     """Arctic Shift (arctic-shift.photon-reddit.com), a second public Reddit archive."""
     f.min_interval = max(f.min_interval, 1.5)
     for sub, cc in subs.items():
         for kind, path, field in (("comment", "comments", "body"), ("submission", "posts", "query")):
             key = f"arctic:{sub}:{kind}"
-            params = {"subreddit": sub, field: "indian", "limit": 100, "sort": "desc"}
+            params = {"subreddit": sub, field: LOCAL_TERM.get(cc, "indian"), "limit": 100, "sort": "desc"}
             if state.get(key):
                 params["after"] = state[key]
             try:
@@ -227,7 +237,7 @@ def _reddit_pullpush(f, subs, state):
     for sub, cc in subs.items():
         for kind in ("comment", "submission"):
             key = f"{sub}:{kind}"
-            params = {"q": "indians|indian|desi|pajeet|jeet", "subreddit": sub, "size": 100, "sort": "desc"}
+            params = {"q": REDDIT_QUERY, "subreddit": sub, "size": 100, "sort": "desc"}
             if state.get(key):
                 params["after"] = state[key]
             try:
@@ -352,21 +362,41 @@ GNEWS_EDITIONS = ["US", "GB", "CA", "AU", "NZ", "IE", "SG", "MY", "ZA", "NG", "K
                   "GH", "UG", "TZ", "ZW", "BW", "NA", "ET", "LB"]
 
 
+# Local-language editions: (country, hl, ceid language, query in that language)
+GNEWS_LOCAL = [
+    ("MX", "es-419", "es-419", 'hindúes OR "inmigrantes indios"'), ("ES", "es", "es", 'hindúes OR "inmigrantes indios"'),
+    ("AR", "es-419", "es-419", 'hindúes OR "inmigrantes indios"'), ("CO", "es-419", "es-419", 'hindúes OR "inmigrantes indios"'),
+    ("CL", "es-419", "es-419", 'hindúes OR "inmigrantes indios"'), ("PE", "es-419", "es-419", 'hindúes OR "inmigrantes indios"'),
+    ("BR", "pt-BR", "pt-419", "indianos"), ("PT", "pt-PT", "pt-150", "indianos"),
+    ("FR", "fr", "fr", "Indiens"), ("BE", "fr", "fr", "Indiens"), ("CA", "fr-CA", "fr", "Indiens"),
+    ("DE", "de", "de", "Inder"), ("AT", "de", "de", "Inder"), ("CH", "de", "de", "Inder"),
+    ("IT", "it", "it", "indiani"), ("NL", "nl", "nl", "Indiërs"), ("PL", "pl", "pl", "Hindusi OR Hindusów"),
+    ("RU", "ru", "ru", "индийцы OR индусы"),
+    ("AE", "ar", "ar", "الهنود"), ("SA", "ar", "ar", "الهنود"), ("EG", "ar", "ar", "الهنود"), ("LB", "ar", "ar", "الهنود"),
+    ("TR", "tr", "tr", "Hintliler"), ("ID", "id", "id", '"orang India"'), ("MY", "ms", "ms", '"orang India"'),
+    ("JP", "ja", "ja", "インド人"), ("TW", "zh-TW", "zh-Hant", "印度人"), ("HK", "zh-HK", "zh-Hant", "印度人"),
+]
+
+
 def google_news(f):
-    for cc in GNEWS_EDITIONS:
-        for q in ("indians", "\"indian immigrants\"", "\"anti-indian\""):
-            params = urllib.parse.urlencode({"q": q, "hl": f"en-{cc}", "gl": cc, "ceid": f"{cc}:en"})
-            try:
-                xml = f.get(f"https://news.google.com/rss/search?{params}", as_json=False)
-            except Exception:
-                continue
-            for item in ET.fromstring(xml).iter("item"):
-                link = item.findtext("link") or ""
-                src = item.find("source")
-                yield {"id": f"gnews:{hashlib.sha1(link.encode()).hexdigest()[:16]}", "source": "google_news",
-                       "kind": "news", "country": cc,
-                       "author": author_hash("gnews", src.text if src is not None else link),
-                       "text": item.findtext("title") or "", "context": "", "url": link, "created": item.findtext("pubDate")}
+    queries = [(cc, f"en-{cc}", "en", q) for cc in GNEWS_EDITIONS
+               for q in ("indians", "\"indian immigrants\"", "\"anti-indian\"")] + GNEWS_LOCAL
+    for cc, hl, lang, q in queries:
+        params = urllib.parse.urlencode({"q": q, "hl": hl, "gl": cc, "ceid": f"{cc}:{lang}"})
+        try:
+            xml = f.get(f"https://news.google.com/rss/search?{params}", as_json=False)
+            items = ET.fromstring(xml).iter("item")
+        except HostDown:
+            return
+        except Exception:
+            continue
+        for item in items:
+            link = item.findtext("link") or ""
+            src = item.find("source")
+            yield {"id": f"gnews:{hashlib.sha1(link.encode()).hexdigest()[:16]}", "source": "google_news",
+                   "kind": "news", "country": cc,
+                   "author": author_hash("gnews", src.text if src is not None else link),
+                   "text": item.findtext("title") or "", "context": "", "url": link, "created": item.findtext("pubDate")}
 
 
 # ---------------------------------------------------------- Hacker News -----
@@ -385,6 +415,7 @@ def hackernews(f, pages=5):
 
 
 # ------------------------------------------------------------- Mastodon -----
+SUPPORTED_LANGS = {None, "en", "es", "pt", "fr", "de", "it", "nl", "pl", "ru", "ar", "tr", "id", "ms", "ja", "zh"}
 MASTODON_INSTANCES = {
     "mastodon.social": None, "mastodon.online": None, "mstdn.social": None, "mas.to": None,
     "mstdn.ca": "CA", "mastodon.scot": "GB", "mastodon.org.uk": "GB", "aus.social": "AU", "mastodon.nz": "NZ",
@@ -395,7 +426,7 @@ MASTODON_INSTANCES = {
 }
 
 
-def mastodon(f, tags=("india", "indians", "indian", "h1b", "immigration")):
+def mastodon(f, tags=("india", "indians", "indian", "h1b", "immigration", "inder", "indianos", "indiens", "indiani")):
     for inst, cc in MASTODON_INSTANCES.items():
         for tag in tags:
             try:
@@ -403,7 +434,7 @@ def mastodon(f, tags=("india", "indians", "indian", "h1b", "immigration")):
             except Exception:
                 continue
             for s in statuses:
-                if s.get("language") not in (None, "en"):
+                if s.get("language") not in SUPPORTED_LANGS:
                     continue
                 acct = s.get("account", {})
                 # Only count local accounts toward the instance's country.
@@ -425,7 +456,7 @@ LEMMY_INSTANCES = {
 }
 
 
-def lemmy(f, terms=("indians", "indian immigrants", "pajeet", "h1b")):
+def lemmy(f, terms=("indians", "indian immigrants", "pajeet", "h1b", "Inder", "Indiërs", "indiani", "Hindusi")):
     for inst, cc in LEMMY_INSTANCES.items():
         for term in terms:
             for kind in ("Comments", "Posts"):
