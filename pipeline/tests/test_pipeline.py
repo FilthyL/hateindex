@@ -155,6 +155,66 @@ class Dates(unittest.TestCase):
         self.assertEqual((last["posts"], last["hostile"], last["share"]), (2, 1, 0.5))
 
 
+class YouTube(unittest.TestCase):
+    SEARCH = {"contents": {"twoColumnSearchResultsRenderer": {"primaryContents": {"sectionListRenderer": {"contents": [
+        {"itemSectionRenderer": {"contents": [
+            {"videoRenderer": {"videoId": "vid1", "title": {"runs": [{"text": "Why are there so many Indians in Canada"}]}}},
+        ]}}]}}}}}
+    WATCH = {"contents": {"twoColumnWatchNextResults": {"results": {"results": {"contents": [
+        {"itemSectionRenderer": {"sectionIdentifier": "related", "contents": [
+            {"continuationItemRenderer": {"continuationEndpoint": {"continuationCommand": {"token": "WRONG"}}}}]}},
+        {"itemSectionRenderer": {"sectionIdentifier": "comment-item-section", "contents": [
+            {"continuationItemRenderer": {"continuationEndpoint": {"continuationCommand": {"token": "C1"}}}}]}},
+    ]}}}}}
+    PAGE1 = {
+        "onResponseReceivedEndpoints": [{"reloadContinuationItemsCommand": {"continuationItems": [
+            {"commentThreadRenderer": {}},
+            {"continuationItemRenderer": {"continuationEndpoint": {"continuationCommand": {"token": "C2"}}}}]}}],
+        "frameworkUpdates": {"entityBatchUpdate": {"mutations": [
+            {"payload": {"commentEntityPayload": {"properties": {"commentId": "a1", "content": {"content": "they are vermin, send them back"},
+                                                                 "publishedTime": "2 days ago"},
+                                                  "author": {"channelId": "UC1", "displayName": "@x"}}}}]}},
+    }
+    PAGE2 = {"onResponseReceivedEndpoints": [{"appendContinuationItemsAction": {"continuationItems": [
+        {"commentThreadRenderer": {"comment": {"commentRenderer": {
+            "commentId": "a2", "contentText": {"runs": [{"text": "Great video, Indian food is the best"}]},
+            "authorText": {"simpleText": "@y"}}}}}]}}]}
+
+    def fetcher(self):
+        test = self
+
+        class F:
+            min_interval = 0
+            calls = []
+
+            def post_json(self, url, payload, headers=None):
+                self.calls.append(payload)
+                if url.startswith("https://www.youtube.com/youtubei/v1/search"):
+                    return test.SEARCH if payload["query"] == "indians in canada" else {}
+                if "videoId" in payload:
+                    return test.WATCH
+                return {"C1": test.PAGE1, "C2": test.PAGE2}[payload["continuation"]]
+        return F()
+
+    def test_comments_both_formats(self):
+        f, state = self.fetcher(), {}
+        recs = list(C.youtube(f, state=state))
+        self.assertEqual([r["id"] for r in recs], ["yt:a1", "yt:a2"])
+        self.assertEqual(recs[0]["context"], "Why are there so many Indians in Canada")
+        self.assertIsNone(recs[0]["country"])
+        self.assertIn("vid1", state["videos"])
+        from hateindex.classify import classify
+        self.assertEqual(classify(recs[0]["text"], recs[0]["context"]).severity, 4)
+
+    def test_video_not_reread_same_day(self):
+        f, state = self.fetcher(), {}
+        list(C.youtube(f, state=state))
+        f2 = self.fetcher()
+        f2.calls = []
+        self.assertEqual(list(C.youtube(f2, state=state)), [])
+        self.assertFalse(any("videoId" in c for c in f2.calls))
+
+
 class Aggregate(unittest.TestCase):
     def test_build(self):
         f = FakeFetcher({"https://a.4cdn.org/pol/catalog.json": CATALOG, "https://a.4cdn.org/pol/thread/1.json": THREAD})

@@ -6,7 +6,7 @@
     "4chan": "Post's country flag", reddit: "Country subreddit", gdelt: "Outlet's country",
     google_news: "Country edition", mastodon: "Instance country", lemmy: "Instance country", hackernews: "None (global only)",
     bluesky: "None (global only)", medium: "None (global only)", wordpress: "None (global only)",
-    youtube: "Needs API key", x: "Needs API key",
+    youtube: "None (worldwide & language only)", x: "Needs API key",
   };
   let data = null, layer = "people", byNum = new Map(), paths = null;
   const tip = document.getElementById("tip");

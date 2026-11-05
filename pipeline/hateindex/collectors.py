@@ -53,7 +53,11 @@ class Fetcher:
         if self.deadline and time.time() >= self.deadline:
             raise BudgetExceeded("time budget reached")
 
-    def get(self, url, headers=None, as_json=True):
+    def post_json(self, url, payload, headers=None):
+        return self.get(url, headers={"Content-Type": "application/json", **(headers or {})},
+                        body=json.dumps(payload).encode())
+
+    def get(self, url, headers=None, as_json=True, body=None):
         host = urllib.parse.urlparse(url).netloc
         if host in self._dead:
             raise HostDown(host)
@@ -61,7 +65,7 @@ class Fetcher:
         wait = self.min_interval - (time.time() - self._last.get(host, 0))
         if wait > 0:
             time.sleep(wait)
-        req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*", **(headers or {})})
+        req = urllib.request.Request(url, data=body, headers={"User-Agent": UA, "Accept": "*/*", **(headers or {})})
         err = None
         for attempt in range(self.retries):
             self._check_budget()
@@ -535,10 +539,119 @@ def wordpress(f, tags=("indians", "india", "indian-immigrants", "racism")):
 
 
 # ------------------------------------------------- Keyed (future) sources ---
-def youtube(f):
-    if not os.environ.get("YOUTUBE_API_KEY"):
-        raise RuntimeError("skipped: set YOUTUBE_API_KEY to enable")
-    raise NotImplementedError("YouTube collector is planned once a key is provided")
+# --------------------------------------------------------------- YouTube ---
+# YouTube's own web API ("innertube", what youtube.com calls); no key needed.
+# Commenters have no location, so comments count toward the worldwide and
+# per-language numbers, not country scores.
+YT_API = "https://www.youtube.com/youtubei/v1/"
+YT_CLIENT = {"clientName": "WEB", "clientVersion": "2.20251020.01.00"}
+YT_QUERIES = [  # (query, hl, gl)
+    ("indians in canada", "en", "CA"), ("indian immigrants", "en", "US"), ("h1b indians", "en", "US"),
+    ("indians in uk", "en", "GB"), ("indians in australia", "en", "AU"), ("indian students", "en", "CA"),
+    ("indians in dubai", "en", "AE"), ("indians in ireland", "en", "IE"),
+    ("inmigrantes indios", "es", "ES"), ("indianos", "pt", "BR"), ("immigrés indiens", "fr", "FR"),
+    ("Inder Deutschland", "de", "DE"), ("indiani in italia", "it", "IT"), ("индийцы мигранты", "ru", "RU"),
+    ("العمالة الهندية", "ar", "SA"), ("Hintliler", "tr", "TR"), ("orang India", "id", "ID"),
+    ("インド人 移民", "ja", "JP"), ("印度人", "zh-TW", "TW"),
+]
+
+
+def _walk(obj, key):
+    """Yield every value stored under `key` anywhere in a nested JSON object."""
+    stack = [obj]
+    while stack:
+        o = stack.pop()
+        if isinstance(o, dict):
+            for k, v in o.items():
+                if k == key:
+                    yield v
+                stack.append(v)
+        elif isinstance(o, list):
+            stack.extend(o)
+
+
+def _yt_text(t):
+    if not isinstance(t, dict):
+        return ""
+    return t.get("simpleText") or t.get("content") or "".join(r.get("text", "") for r in t.get("runs", []))
+
+
+def _yt_post(f, endpoint, hl, gl, **payload):
+    return f.post_json(YT_API + endpoint + "?prettyPrint=false",
+                       {"context": {"client": {**YT_CLIENT, "hl": hl, "gl": gl}}, **payload})
+
+
+def _yt_comments(data):
+    """Comments from a /next continuation response; handles the old and new formats."""
+    out = []
+    for p in _walk(data, "commentEntityPayload"):  # 2024+ format
+        props, author = p.get("properties", {}), p.get("author", {})
+        out.append((props.get("commentId"), _yt_text(props.get("content")), author.get("channelId")
+                    or author.get("displayName"), props.get("publishedTime")))
+    for c in _walk(data, "commentRenderer"):       # older format
+        out.append((c.get("commentId"), _yt_text(c.get("contentText")),
+                    (c.get("authorEndpoint", {}).get("browseEndpoint", {}) or {}).get("browseId") or _yt_text(c.get("authorText")),
+                    _yt_text(c.get("publishedTimeText"))))
+    return [c for c in out if c[0] and c[1]]
+
+
+def _yt_next_token(data, section=None):
+    """The continuation token for the (next page of) comments."""
+    roots = [data]
+    if section:
+        roots = [s for s in _walk(data, "itemSectionRenderer") if s.get("sectionIdentifier") == section] or [data]
+    for root in roots:
+        for item in _walk(root, "continuationItemRenderer"):
+            for cmd in _walk(item, "continuationCommand"):
+                if cmd.get("token"):
+                    return cmd["token"]
+    return None
+
+
+def youtube(f, state=None, videos_per_query=4, pages_per_video=3):
+    state = state if state is not None else {}
+    done = state.setdefault("videos", {})          # videoId -> unix time last read
+    now = time.time()
+    for vid, t in list(done.items()):
+        if now - t > 14 * 86400:
+            del done[vid]
+    got_any = False
+    for q, hl, gl in YT_QUERIES:
+        try:
+            res = _yt_post(f, "search", hl, gl, query=q, params="EgIQAQ==")  # videos only
+        except HostDown:
+            raise
+        except Exception:
+            continue
+        videos, seen_ids = [], set()
+        for v in _walk(res, "videoRenderer"):
+            if v.get("videoId") and v["videoId"] not in seen_ids:
+                seen_ids.add(v["videoId"])
+                videos.append((v["videoId"], _yt_text(v.get("title"))))
+        for vid, title in videos[:videos_per_query]:
+            if now - done.get(vid, 0) < 86400:      # re-read a video at most once a day
+                continue
+            try:
+                page = _yt_post(f, "next", hl, gl, videoId=vid)
+                token = _yt_next_token(page, "comment-item-section")
+                for _ in range(pages_per_video):
+                    if not token:
+                        break
+                    page = _yt_post(f, "next", hl, gl, continuation=token)
+                    for cid, text, author, published in _yt_comments(page):
+                        got_any = True
+                        yield {"id": f"yt:{cid}", "source": "youtube", "kind": "social", "country": None,
+                               "author": author_hash("yt", author or cid), "text": text, "context": title,
+                               "url": f"https://www.youtube.com/watch?v={vid}&lc={cid}", "created": None,
+                               "published_text": published}
+                    token = _yt_next_token(page)
+                done[vid] = now
+            except HostDown:
+                raise
+            except Exception:
+                continue
+    if not got_any and not done:
+        raise RuntimeError("YouTube returned no comments (search or comment format may have changed)")
 
 
 def x_twitter(f):
