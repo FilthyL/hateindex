@@ -100,6 +100,27 @@ class RedditFallback(unittest.TestCase):
         self.assertEqual(state["s0:comment"], 1700000500)
 
 
+class ArchiveGiveUp(unittest.TestCase):
+    def test_dry_archive_hands_over_to_next(self):
+        import urllib.error
+
+        class F(FakeFetcher):
+            def get(self, url, headers=None, as_json=True):
+                if url.startswith("https://www.reddit.com/"):
+                    raise urllib.error.HTTPError(url, 403, "Blocked", {}, None)
+                if url.startswith("https://api.pullpush.io/"):
+                    return {"data": []}            # answers, but never has anything
+                return super().get(url, headers, as_json)
+
+        body = {"data": [{"id": "z1", "body": "deport all indians", "author": "u", "created_utc": 5}]}
+        f = F({"https://arctic-shift.photon-reddit.com/": body})
+        f.min_interval, f.deadline = 0, None
+        state = {}
+        recs = list(C.reddit(f, subs={f"s{i}": "AU" for i in range(20)}, state=state))
+        self.assertTrue(recs)
+        self.assertEqual(state["_status"]["pullpush"], "no results")
+
+
 class Lemmy(unittest.TestCase):
     def test_local_users_get_instance_country(self):
         body = {"comments": [

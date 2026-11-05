@@ -164,7 +164,9 @@ def reddit(f, max_threads_per_sub=8, subs=None, state=None):
             if got:
                 break
         if not got:
-            raise RuntimeError(f"{blocked}; PullPush and Arctic Shift fallbacks returned nothing") from blocked
+            why = state.get("_status", {})
+            raise RuntimeError(f"{blocked}; archives returned nothing (PullPush: {why.get('pullpush', '?')}; "
+                               f"Arctic Shift: {why.get('arctic', '?')})") from blocked
 
 
 def _reddit_direct(f, max_threads_per_sub, subs):
@@ -201,9 +203,23 @@ def _reddit_direct(f, max_threads_per_sub, subs):
                     stack.extend(rep["data"]["children"])
 
 
+class _ArchiveGiveUp:
+    """Decide when a Reddit archive isn't working, so the next one gets a turn."""
+
+    def __init__(self, share_seconds, max_dry=6):
+        self.stop_at, self.max_dry, self.dry, self.last = time.time() + share_seconds, max_dry, 0, None
+
+    def result(self, n_items, problem=None):
+        self.dry = 0 if n_items else self.dry + 1
+        if problem:
+            self.last = problem
+
+    @property
+    def done(self):
+        return self.dry >= self.max_dry or time.time() >= self.stop_at
+
+
 # English plus local-language terms, for subreddits that don't post in English
-REDDIT_QUERY = ("indians|indian|desi|pajeet|jeet|hindúes|indianos|indiens|inder|indiani|indiërs|hindusi|hintliler|"
-                "индийцы|индусы|الهنود|インド人|印度人")
 LOCAL_TERM = {"MX": "hindúes", "ES": "hindúes", "AR": "hindúes", "CL": "hindúes", "CO": "hindúes", "PE": "hindúes",
               "VE": "hindúes", "EC": "hindúes", "UY": "hindúes", "BR": "indianos", "PT": "indianos", "FR": "indiens",
               "BE": "indiens", "DE": "inder", "AT": "inder", "CH": "inder", "IT": "indiani", "NL": "indiërs",
@@ -213,53 +229,57 @@ LOCAL_TERM = {"MX": "hindúes", "ES": "hindúes", "AR": "hindúes", "CL": "hind�
 
 def _reddit_arctic(f, subs, state):
     """Arctic Shift (arctic-shift.photon-reddit.com), a second public Reddit archive."""
-    f.min_interval = max(f.min_interval, 1.5)
-    for sub, cc in subs.items():
-        for kind, path, field in (("comment", "comments", "body"), ("submission", "posts", "query")):
-            key = f"arctic:{sub}:{kind}"
-            params = {"subreddit": sub, field: LOCAL_TERM.get(cc, "indian"), "limit": 100, "sort": "desc"}
-            if state.get(key):
-                params["after"] = state[key]
-            try:
-                data = f.get(f"https://arctic-shift.photon-reddit.com/api/{path}/search?" + urllib.parse.urlencode(params))
-            except HostDown:
-                return
-            except Exception:
-                continue
-            items = data.get("data") or [] if isinstance(data, dict) else []
-            for d in items:
-                text = d.get("body", "") if kind == "comment" else d.get("title", "") + "\n" + d.get("selftext", "")
-                d.setdefault("name", ("t1_" if kind == "comment" else "t3_") + str(d.get("id")))
-                yield _reddit_rec(d, sub, cc, text, "", d.get("permalink"))
-            if items:
-                state[key] = max(int(d.get("created_utc", 0)) for d in items)
+    yield from _reddit_archive(f, subs, state, "arctic", 1.5)
 
 
 def _reddit_pullpush(f, subs, state):
     """PullPush search, newest first, picking up after the newest item already stored."""
-    f.min_interval = max(f.min_interval, 2.0)
+    yield from _reddit_archive(f, subs, state, "pullpush", 2.0)
+
+
+def _archive_url(name, kind, sub, term, after):
+    if name == "pullpush":
+        params = {"q": term, "subreddit": sub, "size": 100, "sort": "desc"}
+        if after:
+            params["after"] = after
+        return f"https://api.pullpush.io/reddit/search/{kind}/?" + urllib.parse.urlencode(params)
+    path, field = ("comments", "body") if kind == "comment" else ("posts", "query")
+    params = {"subreddit": sub, field: term, "limit": 100, "sort": "desc"}
+    if after:
+        params["after"] = after
+    return f"https://arctic-shift.photon-reddit.com/api/{path}/search?" + urllib.parse.urlencode(params)
+
+
+def _reddit_archive(f, subs, state, name, interval):
+    f.min_interval = max(f.min_interval, interval)
+    # half of what's left of Reddit's budget, so the next archive still gets a turn
+    deadline = getattr(f, "deadline", None)
+    remaining = (deadline - time.time()) if deadline else 600
+    gate = _ArchiveGiveUp(max(60, remaining / 2))
+    prefix = "" if name == "pullpush" else "arctic:"
     for sub, cc in subs.items():
         for kind in ("comment", "submission"):
-            key = f"{sub}:{kind}"
-            params = {"q": REDDIT_QUERY, "subreddit": sub, "size": 100, "sort": "desc"}
-            if state.get(key):
-                params["after"] = state[key]
-            try:
-                data = f.get("https://api.pullpush.io/reddit/search/" + kind + "/?" + urllib.parse.urlencode(params))
-            except HostDown:
+            if gate.done:
+                state.setdefault("_status", {})[name] = gate.last or "no results"
                 return
-            except Exception:
+            key = f"{prefix}{sub}:{kind}"
+            try:
+                data = f.get(_archive_url(name, kind, sub, LOCAL_TERM.get(cc, "indian"), state.get(key)))
+            except HostDown:
+                state.setdefault("_status", {})[name] = "host unreachable"
+                return
+            except Exception as e:
+                gate.result(0, f"{type(e).__name__}: {e}"[:120])
                 continue
-            items = data.get("data", []) if isinstance(data, dict) else []
+            items = (data.get("data") or []) if isinstance(data, dict) else []
+            gate.result(len(items))
             for d in items:
-                if kind == "comment":
-                    text, perma = d.get("body", ""), d.get("permalink")
-                else:
-                    text, perma = d.get("title", "") + "\n" + d.get("selftext", ""), d.get("permalink")
+                text = d.get("body", "") if kind == "comment" else d.get("title", "") + "\n" + (d.get("selftext") or "")
                 d.setdefault("name", ("t1_" if kind == "comment" else "t3_") + str(d.get("id")))
-                yield _reddit_rec(d, sub, cc, text, "", perma)
+                yield _reddit_rec(d, sub, cc, text, "", d.get("permalink"))
             if items:
                 state[key] = max(int(d.get("created_utc", 0)) for d in items)
+    state.setdefault("_status", {})[name] = "ok"
 
 
 def _reddit_rec(d, sub, cc, text, ctx, permalink):
