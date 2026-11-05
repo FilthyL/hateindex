@@ -55,6 +55,30 @@ class Result:
         return d
 
 
+ANCHOR_WINDOW = 60  # characters between a cue and a mention of Indians
+
+
+def _anchors(text, pronouns):
+    spans = [m.span() for m in T.GROUP.finditer(text)] + [m.span() for m in T.SLURS.finditer(text)]
+    if pronouns:
+        spans += [m.span() for m in T.PRONOUN_TARGET.finditer(text)]
+    return spans
+
+
+def _near(pattern, text, anchors, window=ANCHOR_WINDOW):
+    """True if `pattern` matches within `window` characters of a mention of Indians.
+
+    Stops a contempt word aimed at someone else ("I didn't say that, retard")
+    from counting just because the thread is about Indians.
+    """
+    for m in pattern.finditer(text):
+        a, b = m.span()
+        for x, y in anchors:
+            if (x - window) <= b and a <= (y + window):
+                return True
+    return False
+
+
 def _targets(sentence: str, context_targeted: bool) -> bool:
     if T.GROUP_FALSE.search(sentence) and not T.SLURS.search(sentence):
         stripped = T.GROUP_FALSE.sub(" ", sentence)
@@ -92,6 +116,10 @@ def classify(text: str, context: str = "") -> Result:
             r.state_only = True
             return r
         return _classify_other_language(r, body, low)
+    # Native Americans, sports teams, motorcycles: not about people from India
+    both = low + " \n " + ctx
+    if T.OTHER_SENSE.search(both) and not T.INDIA_TIE.search(both) and not T.SLURS.search(low):
+        return r
     r.targeted = True
     r.lang = "en"
 
@@ -101,11 +129,11 @@ def classify(text: str, context: str = "") -> Result:
             or T.SCARE_QUOTED.search(body)):
         r.sarcastic = True
         return r
-    if T.COUNTER_SPEECH.search(low) and not T.NOT_RACIST_BUT.search(low):
+    if (T.COUNTER_SPEECH.search(low) or T.REPORTED.search(low)) and not T.NOT_RACIST_BUT.search(low):
         r.counter = True
         return r
 
-    scope = " \n ".join(scoped)
+    scope = T.VOCATIVE.sub(" ", " \n ".join(scoped))
     if T.NEGATION.search(scope):
         r.negated = True
 
@@ -115,14 +143,16 @@ def classify(text: str, context: str = "") -> Result:
         r.slur, sev = True, 2
 
     can_attribute = generalises or r.slur
-    claims = [sid for sid, rxc in T.CLAIMS.items() if can_attribute and rxc.search(scope)]
+    anchors = _anchors(scope, pronouns=True)
+    claims = [sid for sid, rxc in T.CLAIMS.items() if can_attribute and _near(rxc, scope, anchors, 80)]
     if claims and not r.negated:
         sev = max(sev, 1)
-    if T.CONTEMPT.search(scope) and (generalises or r.slur):
+    # comparisons name the group themselves ("worse than Indians"), so they need no separate generalisation
+    if (can_attribute and _near(T.CONTEMPT, scope, anchors)) or _near(T.COMPARATIVE, scope, anchors):
         sev = max(sev, 2)
-    if T.DEHUMANISE.search(scope) and (generalises or r.slur):
+    if can_attribute and _near(T.DEHUMANISE, scope, anchors):
         sev = max(sev, 3)
-    if T.EXCLUDE_VIOLENCE.search(scope):
+    if _near(T.EXCLUDE_VIOLENCE, scope, anchors, 80):
         sev = 4
         if "immigration" not in r.reasons:
             r.reasons.append("immigration")

@@ -36,8 +36,8 @@ SLURS = rx(
     r"\bpajeets?\b", r"\bpoo+(?:\s|-)?in(?:\s|-)?(?:the\s)?loo+s?\b", r"\bstreet ?sh[i1]tt?ers?\b",
     r"\bcurry ?(?:munchers?|monkeys?|niggers?|n[i1]gg?as?|eaters?)\b", r"\bdot ?heads?\b",
     r"\bsaa+r\b(?=.*\b(?:needful|kindly|bobs|vagene|redeem|indian|pajeet)\b)",
-    r"\bbobs? and vag(?:ene|ana|ina)\b", r"\bdo the needful\b", r"\bredeem\b.*\bsaa+r\b",
-    r"\bjeets?\b", r"\bcurry ?(?:land|stan)\b", r"\bpoojeets?\b", r"\bsh[i1]tskins?\b",
+    r"\bbobs? and vag(?:ene|ana|ina)\b", r"\bredeem\b.*\bsaa+r\b", r"\bsaa+rs\b",
+    r"\bjeets?\b", r"\bcurry ?(?:land|stan)\b", r"\bpoojeets?\b",
 )
 
 # Pronouns that refer back to the group when the surrounding thread is about Indians.
@@ -83,6 +83,8 @@ EXCLUDE_VIOLENCE = rx(
     r"\bkill (?:all |every |the |them|these|those|indians|jeets|pajeets)", r"\bgas (?:them|the indians|all)\b",
     r"\bexterminat", r"\bethnic(?:ally)? cleans", r"\bday of the rope\b", r"\bhang (?:them|all)\b",
     r"\bstop (?:all )?indian (?:immigration|migration|visas)\b", r"\bclose the (?:borders?|gates?) to indians\b",
+    r"\bexecut(?:e|ing) (?:all |the )?(?:indians|them|jeets|pajeets)\b", r"\bgenocid(?:e|ing)\b",
+    r"\bhunt(?:ing)? (?:down )?(?:indians|them|jeets|pajeets)\b", r"\blynch", r"\bshoot (?:them|indians|jeets)\b",
 )
 
 # --- Reasons ("why") and stereotypes ("what") --------------------------------
@@ -189,6 +191,42 @@ CLAIMS = {
 }
 STEREOTYPES["incompetent"] = ("Indians are incompetent / lazy", "workplace", CLAIMS["incompetent"])
 
+# Hostility expressed by comparison or sweeping blame, which has no single cue word.
+COMPARATIVE = rx(
+    r"\b(?:nowhere near|not even|not) as bad as (?:the )?(?:indians|jeets|pajeets|desis)\b",
+    r"\bworse than (?:the )?(?:indians|jeets|pajeets)\b", r"\b(?:indians|jeets|pajeets) are (?:even )?worse\b",
+    r"\bat least (?:they|we|i)?\s*use (?:a )?toilets?\b", r"\b(?:i )?(?:like|prefer) \w+ more th[ae]n (?:the )?(?:indians|jeets)\b",
+    r"\bruin(?:s|ed|ing)? (?:everything|every (?:place|country|city|thing)|this country|the (?:country|neighbou?rhood|city))\b",
+    r"\boutbreed", r"\bflood(?:ed|ing|s)? [\w ]{1,20} with (?:indians|jeets|pajeets|them)\b",
+)
+
+# Someone describing or rejecting a view, not holding it.
+REPORTED = rx(
+    r"\b(?:they|you|people|he|she|some|others|folks)(?:'re| are| is)? (?:saying|claiming|suggesting|implying|pretending)\b",
+    r"\bthe (?:idea|notion|claim|myth|stereotype|trope|assumption) that\b", r"\btrash opinion\b",
+    r"\bdeserves? (?:the )?downvotes\b", r"\bstupid (?:politics|to blame)\b", r"\b(?:wrong|unfair|lazy) to blame\b",
+    r"\bblaming (?:indians|immigrants|them) for\b", r"\bget(?:ting)? attacked for\b", r"\bi am tired of it\b",
+    r"\b(?:arrested|charged|convicted|sentenced|jailed|detained|indicted)\b",
+)
+# Insults addressed to the person being replied to, not to Indians
+VOCATIVE = re.compile(r",\s*(?:you\s+)?(?:fucking\s+)?(?:retard(?:ed)?|idiot|moron|dumbass|faggot|nigger|cunt)s?\b", re.I)
+
+# Other meanings of "Indians": Native Americans, sports teams, motorcycles.
+OTHER_SENSE = rx(
+    r"\btrib(?:e|es|al)\b", r"\bnative americans?\b", r"\breservations?\b", r"\bsettlers?\b", r"\bcolonists?\b",
+    r"\b(?:cherokee|sioux|apache|navajo|shoshone|comanche|lakota|iroquois|mohawk|cree|ojibwe|atsina|naumkeag|kwaaymii)\b",
+    r"\b(?:wigwams?|tepees?|tipis?|buffalo|cowboys?|thanksgiving|pilgrims|frontier|war party|smallpox|columbus|pocahontas)\b",
+    r"\bland back\b", r"\bindigenous\b", r"\bfirst nations\b", r"\bamazon(?:ian)?\b",
+    r"\b(?:mlb|baseball|innings?|final score|touchdown|quarterback|varsity|playoffs?|ballpark|pitcher|world series)\b",
+    r"\b(?:tigers|white sox|yankees|vikings|red sox|guardians|braves|chiefs) \d", r"\b\d+-\d+\b(?=.*\b(?:win|loss|beat|defeat|game))",
+    r"\bmotorcycles?\b", r"\bnortons?\b", r"\bharley\b", r"\bvincent\b",
+    r"\bonly good indians\b", r"\b(?:17|18)\d\d\b",
+)
+# Things that tie a post to India despite those cues
+INDIA_TIE = rx(r"\bindia\b", r"\bdesis?\b", r"\bhindus?\b", r"\bsikhs?\b", r"\bh-?1-?bs?\b", r"\bbollywood\b",
+               r"\bdiwali\b", r"\bcurry\b", r"\bmodi\b", r"\bindian[- ]americans?\b", r"\bsouth asians?\b",
+               r"\bjeets?\b", r"\bpajeets?\b", r"\bsaa+r", r"\bcaste\b", r"\bbangalore\b", r"\bdelhi\b", r"\bmumbai\b")
+
 # Political/state critique: legitimate and never by itself hate.
 STATE_CRITIQUE = rx(r"\b(?:modi|bjp|congress party|indian (?:government|govt|state|army|military|policy|"
                     r"foreign ministry|embassy|high commission)|new delhi|government of india)\b")
@@ -214,7 +252,7 @@ COUNTER_SPEECH = rx(
     r"\btargeted (?:for|because)\b", r"\bslurs? (?:against|at|toward)\b", r"\bracial abuse\b",
     r"\bcondemn", r"\bunacceptable\b", r"\bcalled (?:it|this) out\b",
     r"\b(?:vile|disgusting|your|such|this) (?:,\s*)?racis(?:t|m)\b", r"\bracist (?:shit|crap|nonsense|garbage|bs|bullshit)\b",
-    r"\bnot going to tolerate\b", r"\bracist slurs?\b", r"\bnew slur\b", r"\bslur (?:targets|aimed|used against)\b",
+    r"\bnot going to tolerate\b", r"\bnothing (?:in .{0,40})?(?:that )?could reasonably be interpreted as racist\b", r"\bracist slurs?\b", r"\bnew slur\b", r"\bslur (?:targets|aimed|used against)\b",
 )
 # "I'm not racist but…" is the opposite of counter-speech.
 NOT_RACIST_BUT = rx(r"\b(?:i'?m|im|i am) not (?:a )?racist,? but\b", r"\bnot (?:to be|trying to be) racist,? but\b")
