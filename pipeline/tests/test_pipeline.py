@@ -136,6 +136,25 @@ class ArcticFallback(unittest.TestCase):
         self.assertEqual(state["arctic:s0:comment"], 1700000900)
 
 
+class Dates(unittest.TestCase):
+    def test_formats(self):
+        from hateindex.aggregate import parse_date
+        for v in ["2026-11-03T20:22:47+00:00", "2026-11-03T20:22:47Z", "Tue, 03 Nov 2026 20:22:47 GMT",
+                  "20261103T202247Z", 1793737367]:
+            with self.subTest(v=v):
+                self.assertEqual(parse_date(v).date().isoformat()[:7], "2026-11")
+        self.assertIsNone(parse_date("not a date"))
+
+    def test_timeline_buckets(self):
+        from datetime import datetime, timezone
+        from hateindex.aggregate import timeline
+        from hateindex.classify import classify
+        now = datetime(2026, 11, 4, tzinfo=timezone.utc)
+        items = [(now, classify("deport all indians")), (now, classify("Indian students celebrate Diwali"))]
+        last = timeline(items, weeks=4, now=now)[-1]
+        self.assertEqual((last["posts"], last["hostile"], last["share"]), (2, 1, 0.5))
+
+
 class Aggregate(unittest.TestCase):
     def test_build(self):
         f = FakeFetcher({"https://a.4cdn.org/pol/catalog.json": CATALOG, "https://a.4cdn.org/pol/thread/1.json": THREAD})
