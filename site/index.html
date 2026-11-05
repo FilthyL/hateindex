@@ -33,6 +33,35 @@
 
   <div id="tip" class="tip" hidden></div>
 
+  <section class="card" id="overview">
+    <h2>World overview</h2>
+    <div id="kpis" class="kpis"></div>
+    <div class="grid2 inner">
+      <div>
+        <h3>By region</h3>
+        <p class="muted small">Pooled across every country in the region, each person counted once. Bar = hate index. <span id="regions-scale"></span></p>
+        <div id="regions"></div>
+      </div>
+      <div>
+        <h3>Posts about Indians per week</h3>
+        <div class="legend small" id="tl-legend"></div>
+        <div id="timeline" class="timeline"></div>
+        <p class="muted small" id="tl-note"></p>
+      </div>
+    </div>
+    <div class="grid2 inner">
+      <div>
+        <h3>By source</h3>
+        <div id="by-source"></div>
+      </div>
+      <div>
+        <h3>Every country with data</h3>
+        <p class="muted small">Including countries that don't have enough people to score yet.</p>
+        <div class="table-scroll coverage"><table id="coverage"><thead><tr><th>Country</th><th>Region</th><th class="num">People</th><th class="num">Index</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
   <section class="grid2">
     <div class="card">
       <h2>Ranking</h2>

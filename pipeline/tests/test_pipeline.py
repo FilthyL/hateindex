@@ -100,6 +100,61 @@ class RedditFallback(unittest.TestCase):
         self.assertEqual(state["s0:comment"], 1700000500)
 
 
+class Lemmy(unittest.TestCase):
+    def test_local_users_get_instance_country(self):
+        body = {"comments": [
+            {"comment": {"ap_id": "https://lemmy.ca/comment/1", "content": "Indians are all scammers"},
+             "creator": {"actor_id": "https://lemmy.ca/u/a", "local": True}, "post": {"name": "thread"}},
+            {"comment": {"ap_id": "https://lemmy.world/comment/2", "content": "send them back"},
+             "creator": {"actor_id": "https://lemmy.world/u/b", "local": False}, "post": {"name": "Indians in Canada"}},
+        ]}
+        f = FakeFetcher({"https://lemmy.ca/api/v3/search": body, "https://": {"comments": [], "posts": []}})
+        recs = [r for r in C.lemmy(f, terms=("indians",)) if r["id"].startswith("lemmy:https://lemmy.")]
+        self.assertEqual([r["country"] for r in recs], ["CA", None])
+        self.assertEqual(recs[1]["context"], "Indians in Canada")
+
+
+class ArcticFallback(unittest.TestCase):
+    def test_arctic_when_pullpush_down(self):
+        import urllib.error
+
+        class F(FakeFetcher):
+            def get(self, url, headers=None, as_json=True):
+                if url.startswith("https://www.reddit.com/"):
+                    raise urllib.error.HTTPError(url, 403, "Blocked", {}, None)
+                if url.startswith("https://api.pullpush.io/"):
+                    raise C.HostDown("api.pullpush.io")
+                return super().get(url, headers, as_json)
+
+        body = {"data": [{"id": "c9", "body": "deport all indians", "author": "u", "created_utc": 1700000900}]}
+        f = F({"https://arctic-shift.photon-reddit.com/": body})
+        f.min_interval = 0
+        state = {}
+        recs = list(C.reddit(f, subs={f"s{i}": "GB" for i in range(5)}, state=state))
+        self.assertTrue(recs)
+        self.assertEqual(recs[0]["country"], "GB")
+        self.assertEqual(state["arctic:s0:comment"], 1700000900)
+
+
+class Dates(unittest.TestCase):
+    def test_formats(self):
+        from hateindex.aggregate import parse_date
+        for v in ["2026-11-03T20:22:47+00:00", "2026-11-03T20:22:47Z", "Tue, 03 Nov 2026 20:22:47 GMT",
+                  "20261103T202247Z", 1793737367]:
+            with self.subTest(v=v):
+                self.assertEqual(parse_date(v).date().isoformat()[:7], "2026-11")
+        self.assertIsNone(parse_date("not a date"))
+
+    def test_timeline_buckets(self):
+        from datetime import datetime, timezone
+        from hateindex.aggregate import timeline
+        from hateindex.classify import classify
+        now = datetime(2026, 11, 4, tzinfo=timezone.utc)
+        items = [(now, classify("deport all indians")), (now, classify("Indian students celebrate Diwali"))]
+        last = timeline(items, weeks=4, now=now)[-1]
+        self.assertEqual((last["posts"], last["hostile"], last["share"]), (2, 1, 0.5))
+
+
 class Aggregate(unittest.TestCase):
     def test_build(self):
         f = FakeFetcher({"https://a.4cdn.org/pol/catalog.json": CATALOG, "https://a.4cdn.org/pol/thread/1.json": THREAD})

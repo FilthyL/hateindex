@@ -25,10 +25,10 @@ STATUS = os.path.join(ROOT, "data", "source_status.json")
 
 # Per-host politeness (seconds between requests).
 INTERVALS = {"reddit": 7.0, "4chan": 1.1, "gdelt": 6.0, "google_news": 2.0, "hackernews": 0.5,
-             "mastodon": 1.0, "bluesky": 1.0, "medium": 2.0, "wordpress": 1.0}
+             "mastodon": 1.0, "lemmy": 1.0, "bluesky": 1.0, "medium": 2.0, "wordpress": 1.0}
 DEFAULT_SOURCES = list(C.COLLECTORS)
 # Max seconds per source per run. Runs are hourly, so the total stays well under an hour.
-BUDGET = {"4chan": 1200, "reddit": 600, "google_news": 300, "mastodon": 300, "hackernews": 180,
+BUDGET = {"4chan": 1000, "reddit": 800, "lemmy": 300, "google_news": 300, "mastodon": 300, "hackernews": 180,
           "bluesky": 180, "gdelt": 180, "medium": 120, "wordpress": 120}
 DEFAULT_BUDGET = 120
 STATE = os.path.join(ROOT, "data", "state")

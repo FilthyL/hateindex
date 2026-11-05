@@ -1,8 +1,10 @@
 """Turn classified posts into the per-country index (docs/DEFINITION.md)."""
 import json
 import os
+import re
+from email.utils import parsedate_to_datetime
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from .classify import classify, SEVERITY_NAMES
 from . import taxonomy as T
@@ -12,6 +14,7 @@ MIN_AUTHORS = 10
 LAYERS = {"people": ("social",), "media": ("news",)}
 DOMESTIC = {"IN"}  # Indians posting about Indians: shown, not ranked
 
+_REGIONS = json.load(open(os.path.join(os.path.dirname(__file__), "regions.json")))
 _COUNTRIES = json.load(open(os.path.join(os.path.dirname(__file__), "countries.json")))
 SHORT_NAMES = {"US": "United States", "GB": "United Kingdom", "RU": "Russia", "KR": "South Korea", "IR": "Iran",
                "VN": "Vietnam", "TW": "Taiwan", "BO": "Bolivia", "VE": "Venezuela", "TZ": "Tanzania", "SY": "Syria",
@@ -20,7 +23,52 @@ SHORT_NAMES = {"US": "United States", "GB": "United Kingdom", "RU": "Russia", "K
 
 def country_meta(cc):
     c = _COUNTRIES.get(cc, {})
-    return {"iso2": cc, "iso3": c.get("a3"), "num": c.get("num"), "name": SHORT_NAMES.get(cc) or c.get("name") or cc}
+    r = _REGIONS.get(cc, {})
+    return {"iso2": cc, "iso3": c.get("a3"), "num": c.get("num"), "name": SHORT_NAMES.get(cc) or c.get("name") or cc,
+            "region": r.get("region") or "Other", "subregion": r.get("sub") or ""}
+
+
+def parse_date(value):
+    """Best-effort date from the formats sources use (ISO, RFC 822, GDELT, epoch)."""
+    if value is None or value == "":
+        return None
+    try:
+        if isinstance(value, (int, float)):
+            return datetime.fromtimestamp(value, timezone.utc)
+        v = str(value).strip()
+        if re.fullmatch(r"\d{8}T\d{6}Z", v):  # GDELT
+            return datetime.strptime(v, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+        if v[:4].isdigit() and "-" in v[:8]:
+            d = datetime.fromisoformat(v.replace("Z", "+00:00"))
+        else:
+            d = parsedate_to_datetime(v)
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError, OverflowError):
+        return None
+
+
+def _week(d):
+    monday = (d - timedelta(days=d.weekday())).date()
+    return monday.isoformat()
+
+
+def timeline(items, weeks=26, now=None):
+    """Weekly sincere posts about Indians and the share that were hostile."""
+    now = now or datetime.now(timezone.utc)
+    start = now - timedelta(weeks=weeks)
+    buckets = defaultdict(lambda: [0, 0])
+    for d, r in items:
+        if d and start <= d <= now + timedelta(days=1):
+            b = buckets[_week(d)]
+            b[0] += 1
+            b[1] += r.hateful
+    out = []
+    for i in range(weeks + 1):
+        w = _week(start + timedelta(weeks=i))
+        posts, hostile = buckets.get(w, [0, 0])
+        out.append({"week": w, "posts": posts, "hostile": hostile,
+                    "share": round(hostile / posts, 4) if posts else None})
+    return out
 
 
 def confidence(n):
@@ -76,7 +124,11 @@ def build(records, window_label="", source_status=None):
     excluded = defaultdict(Counter)                # cc -> {sarcasm, counter, state}
     glob = defaultdict(list)
     src_counts = Counter()
+    src_targeted, src_hostile = Counter(), Counter()
+    by_region = defaultdict(list)                   # region -> [(author, r)] (all layers)
+    dated = defaultdict(list)                       # layer -> [(date, r)]
 
+    first_collected = min((r["collected"] for r in records if r.get("collected")), default=None)
     for rec in records:
         totals["posts"] += 1
         src_counts[rec["source"]] += 1
@@ -97,11 +149,18 @@ def build(records, window_label="", source_status=None):
             excluded[cc]["counter_speech"] += 1
         if r.hateful:
             totals["hateful"] += 1
+        src_targeted[rec["source"]] += 1
+        src_hostile[rec["source"]] += r.hateful
         key = (rec["source"], rec["author"])
+        when = parse_date(rec.get("created")) or parse_date(rec.get("collected"))
         glob["all"].append((key, r))
+        dated["all"].append((when, r))
+        if cc and cc not in DOMESTIC:
+            by_region[country_meta(cc)["region"]].append((key, r))
         for layer, kinds in LAYERS.items():
             if rec["kind"] in kinds:
                 glob[layer].append((key, r))
+                dated[layer].append((when, r))
                 if cc:
                     per[cc][layer].append((key, r))
 
@@ -132,6 +191,26 @@ def build(records, window_label="", source_status=None):
         for i, c in enumerate(ranked, 1):
             c["layers"][layer]["rank"] = i
 
+    regions = []
+    for name, items in by_region.items():
+        st = _layer_stats(items, g["all"]["raw"])
+        members = [c["iso2"] for c in countries.values() if c["region"] == name and not c["domestic"]]
+        regions.append({"region": name, "countries": len(members), "authors": st["authors"], "posts": st["posts"],
+                        "index": st["index"], "raw": st["raw"], "hateful_author_share": st["hateful_author_share"],
+                        "confidence": st["confidence"], "reasons": st["reasons"][:3], "stereotypes": st["stereotypes"][:3]})
+    regions.sort(key=lambda x: -x["authors"])
+
+    overview = {
+        "collection_started": first_collected,
+        "countries_with_data": sum(1 for c in countries.values() if c["layers"]["all"]["authors"]),
+        "countries_scored": {layer: sum(1 for c in countries.values() if c["layers"][layer].get("rank"))
+                             for layer in ["all", *LAYERS]},
+        "regions": regions,
+        "timeline": {layer: timeline(dated[layer]) for layer in ["all", *LAYERS]},
+        "by_source": sorted(({"source": k, "about_indians": v, "hostile": src_hostile[k]}
+                             for k, v in src_targeted.items()), key=lambda x: -x["about_indians"]),
+    }
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "window": window_label, "demo": False,
@@ -141,4 +220,5 @@ def build(records, window_label="", source_status=None):
         "reasons": T.REASONS,
         "stereotypes": {k: v[0] for k, v in T.STEREOTYPES.items()},
         "countries": countries,
+        "overview": overview,
     }
