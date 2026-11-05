@@ -5,6 +5,7 @@ import unicodedata
 from dataclasses import dataclass, field, asdict
 
 from . import taxonomy as T
+from . import multilingual as M
 
 WEIGHTS = {0: 0.0, 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0}
 SEVERITY_NAMES = {0: "Neutral / critique", 1: "Negative stereotyping", 2: "Contempt / slurs",
@@ -38,6 +39,7 @@ class Result:
     slur: bool = False
     reasons: list = field(default_factory=list)
     stereotypes: list = field(default_factory=list)
+    lang: str = ""              # language of the rules that matched ("en", "es", ...)
 
     @property
     def weight(self):
@@ -88,8 +90,10 @@ def classify(text: str, context: str = "") -> Result:
     if not scoped:
         if T.STATE_CRITIQUE.search(low):
             r.state_only = True
-        return r
+            return r
+        return _classify_other_language(r, body, low)
     r.targeted = True
+    r.lang = "en"
 
     # Exclusions first.
     if (T.SARCASM.search(low)
@@ -140,4 +144,25 @@ def classify(text: str, context: str = "") -> Result:
     elif not r.reasons:
         r.reasons.append("general")
     r.severity = sev
+    return r
+
+
+def _classify_other_language(r, body, low):
+    code, sentences = M.detect(low)
+    if not code:
+        return r
+    r.targeted, r.lang = True, code
+    if T.SARCASM.search(low) or T.IRONY_EMOJI.search(body):
+        r.sarcastic = True
+        return r
+    out = M.score(code, sentences, low)
+    if out["counter"]:
+        r.counter = True
+        return r
+    r.slur, r.severity = out["slur"], out["severity"]
+    if r.severity:
+        r.stereotypes = out["stereotypes"]
+        r.reasons = sorted({T.STEREOTYPES[s][1] for s in r.stereotypes}) or ["general"]
+        if r.severity == 4 and "immigration" not in r.reasons:
+            r.reasons.append("immigration")
     return r
