@@ -1,0 +1,98 @@
+{
+  "reddit": {
+    "last_run": "2026-11-14T19:21:55+00:00",
+    "new": 3,
+    "stored": 832,
+    "ok": true,
+    "error": null,
+    "seconds": 130
+  },
+  "4chan": {
+    "last_run": "2026-11-14T19:21:55+00:00",
+    "new": 760,
+    "stored": 25426,
+    "ok": true,
+    "error": null,
+    "seconds": 611
+  },
+  "gdelt": {
+    "last_run": "2026-11-14T19:21:55+00:00",
+    "new": 0,
+    "stored": 29,
+    "ok": true,
+    "error": null,
+    "seconds": 64
+  },
+  "google_news": {
+    "last_run": "2026-11-14T19:21:55+00:00",
+    "new": 55,
+    "stored": 4546,
+    "ok": true,
+    "error": null,
+    "seconds": 239
+  },
+  "hackernews": {
+    "last_run": "2026-11-14T19:21:55+00:00",
+    "new": 0,
+    "stored": 3974,
+    "ok": true,
+    "error": null,
+    "seconds": 21
+  },
+  "mastodon": {
+    "last_run": "2026-11-14T19:21:55+00:00",
+    "new": 29,
+    "stored": 2556,
+    "ok": true,
+    "error": null,
+    "seconds": 241
+  },
+  "bluesky": {
+    "last_run": "2026-11-14T19:21:55+00:00",
+    "new": 38,
+    "stored": 1478,
+    "ok": false,
+    "error": "HTTPError: HTTP Error 403: Forbidden",
+    "seconds": 2
+  },
+  "medium": {
+    "last_run": "2026-11-14T19:21:55+00:00",
+    "new": 19,
+    "stored": 781,
+    "ok": true,
+    "error": null,
+    "seconds": 11
+  },
+  "wordpress": {
+    "last_run": "2026-11-14T19:21:55+00:00",
+    "new": 10,
+    "stored": 620,
+    "ok": true,
+    "error": null,
+    "seconds": 29
+  },
+  "youtube": {
+    "last_run": "2026-11-14T19:21:55+00:00",
+    "new": 294,
+    "stored": 30212,
+    "ok": true,
+    "error": null,
+    "seconds": 233
+  },
+  "x": {
+    "last_run": "2026-11-14T19:21:55+00:00",
+    "new": 0,
+    "stored": 0,
+    "ok": false,
+    "error": "RuntimeError: skipped: set X_BEARER_TOKEN to enable",
+    "seconds": 0
+  },
+  "lemmy": {
+    "last_run": "2026-11-14T19:21:55+00:00",
+    "new": 32,
+    "stored": 1543,
+    "ok": true,
+    "error": null,
+    "seconds": 241
+  }
+}
