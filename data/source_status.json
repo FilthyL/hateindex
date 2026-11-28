@@ -1,0 +1,98 @@
+{
+  "reddit": {
+    "last_run": "2026-11-28T08:10:07+00:00",
+    "new": 23,
+    "stored": 1492,
+    "ok": true,
+    "error": null,
+    "seconds": 201
+  },
+  "4chan": {
+    "last_run": "2026-11-28T08:10:07+00:00",
+    "new": 724,
+    "stored": 53126,
+    "ok": true,
+    "error": null,
+    "seconds": 663
+  },
+  "gdelt": {
+    "last_run": "2026-11-28T08:10:07+00:00",
+    "new": 0,
+    "stored": 33,
+    "ok": false,
+    "error": "RuntimeError: URLError: <urlopen error _ssl.c:994: The handshake operation timed out>",
+    "seconds": 62
+  },
+  "google_news": {
+    "last_run": "2026-11-28T08:10:07+00:00",
+    "new": 91,
+    "stored": 8983,
+    "ok": true,
+    "error": null,
+    "seconds": 240
+  },
+  "hackernews": {
+    "last_run": "2026-11-28T08:10:07+00:00",
+    "new": 0,
+    "stored": 4177,
+    "ok": true,
+    "error": null,
+    "seconds": 23
+  },
+  "mastodon": {
+    "last_run": "2026-11-28T08:10:07+00:00",
+    "new": 40,
+    "stored": 4473,
+    "ok": true,
+    "error": null,
+    "seconds": 241
+  },
+  "bluesky": {
+    "last_run": "2026-11-28T08:10:07+00:00",
+    "new": 51,
+    "stored": 3745,
+    "ok": false,
+    "error": "HTTPError: HTTP Error 403: Forbidden",
+    "seconds": 2
+  },
+  "medium": {
+    "last_run": "2026-11-28T08:10:07+00:00",
+    "new": 18,
+    "stored": 1660,
+    "ok": true,
+    "error": null,
+    "seconds": 12
+  },
+  "wordpress": {
+    "last_run": "2026-11-28T08:10:07+00:00",
+    "new": 15,
+    "stored": 1198,
+    "ok": true,
+    "error": null,
+    "seconds": 32
+  },
+  "youtube": {
+    "last_run": "2026-11-28T08:10:07+00:00",
+    "new": 345,
+    "stored": 46855,
+    "ok": true,
+    "error": null,
+    "seconds": 273
+  },
+  "x": {
+    "last_run": "2026-11-28T08:10:07+00:00",
+    "new": 0,
+    "stored": 0,
+    "ok": false,
+    "error": "RuntimeError: skipped: set X_BEARER_TOKEN to enable",
+    "seconds": 0
+  },
+  "lemmy": {
+    "last_run": "2026-11-28T08:10:07+00:00",
+    "new": 15,
+    "stored": 2749,
+    "ok": true,
+    "error": null,
+    "seconds": 242
+  }
+}
